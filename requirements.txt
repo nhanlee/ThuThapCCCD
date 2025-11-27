@@ -16,3 +16,4 @@ ultralytics
 opencv-python
 pandas
 openpyxl
+mysql-connector-python>=8.0.0
