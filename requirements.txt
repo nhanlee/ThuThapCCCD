@@ -3,41 +3,43 @@
 
 Flask==2.2.5
 gunicorn==21.2.0
+flask-cors==4.2.0
+python-dotenv==1.0.0
+python-multipart==0.0.6
 
-# PDF processing (PyMuPDF removed, alternative pdfplumber)
+# PDF processing
 
 pdfplumber==0.10.1
 pypdf==3.15.0
 Pillow==10.0.0
 
-# Torch / Audio
+# Torch / CPU-only (ensure CPU wheels)
 
-torch==2.9.1
-torchaudio==2.9.1
-torchvision==0.15.2
+# Use pip index: [https://download.pytorch.org/whl/cpu](https://download.pytorch.org/whl/cpu)
 
-# OCR / Computer Vision
+torch==2.9.1+cpu --index-url [https://download.pytorch.org/whl/cpu](https://download.pytorch.org/whl/cpu)
+torchaudio==2.9.1+cpu --index-url [https://download.pytorch.org/whl/cpu](https://download.pytorch.org/whl/cpu)
+torchvision==0.15.2+cpu --index-url [https://download.pytorch.org/whl/cpu](https://download.pytorch.org/whl/cpu)
 
+# Computer Vision / OCR
+
+opencv-python-headless==4.11.0.86
 paddleocr==2.10.0
 sahi==0.11.34
-opencv-python-headless==4.11.0.86
-ultralytics==8.1.116  # YOLOv8 latest stable compatible with torch 2.9.1
+ultralytics==8.1.116  # YOLOv8m
 
-# Others
+# Data / Analysis
 
 numpy==1.27.0
 scipy==1.11.0
 pandas==2.1.0
-tqdm==4.66.1
 matplotlib==3.8.1
-scikit-learn==1.3.2
 seaborn==0.12.3
+scikit-learn==1.3.2
+tqdm==4.66.1
 requests==2.32.0
-python-multipart==0.0.6
-python-dotenv==1.0.0
-flask-cors==4.2.0
 
-# Optional / Utilities
+# Utilities
 
 pyyaml==6.0
 loguru==0.7.0
