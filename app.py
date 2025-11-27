@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = 'images'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # Configure logging
@@ -311,6 +311,53 @@ def health_check():
         'ai_enabled': face_model is not None,
         'database': 'connected'
     })
+
+# Thêm endpoint mới để lấy danh sách CCCD đã quét
+@app.route('/getCCCDList', methods=['GET'])
+def get_cccd_list():
+    try:
+        conn = sqlite3.connect('cccd.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, timestamp, cccd, cmnd_cu, hoten, gioitinh, ngaysinh, 
+                   diachi, ngaycap, front_image, back_image, face_image
+            FROM cccd_records 
+            ORDER BY timestamp DESC
+        ''')
+        
+        records = cursor.fetchall()
+        conn.close()
+
+        cccd_list = []
+        for record in records:
+            cccd_list.append({
+                'id': record[0],
+                'timestamp': record[1],
+                'cccd': record[2],
+                'cmnd_cu': record[3],
+                'hoten': record[4],
+                'gioitinh': record[5],
+                'ngaysinh': record[6],
+                'diachi': record[7],
+                'ngaycap': record[8],
+                'front_image': record[9],
+                'back_image': record[10],
+                'face_image': record[11]
+            })
+
+        return jsonify({
+            'success': True,
+            'records': cccd_list
+        })
+    
+    except Exception as e:
+        logger.error(f"Lỗi khi lấy danh sách CCCD: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Lỗi server: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
