@@ -3,9 +3,12 @@ import json
 import base64
 import sqlite3
 import logging
+import zipfile
+import pandas as pd
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 from werkzeug.utils import secure_filename
+import io
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -357,6 +360,91 @@ def get_cccd_list():
             'success': False,
             'error': 'server_error',
             'message': f'Lỗi server: {str(e)}'
+        }), 500
+
+# Thêm endpoint để export dữ liệu ra Excel
+@app.route('/exportExcel')
+def export_excel():
+    try:
+        conn = sqlite3.connect('cccd.db')
+        
+        # Đọc dữ liệu từ database
+        df = pd.read_sql_query('''
+            SELECT timestamp, cccd, cmnd_cu, hoten, gioitinh, ngaysinh, 
+                   diachi, ngaycap, front_image, back_image, face_image
+            FROM cccd_records 
+            ORDER BY timestamp DESC
+        ''', conn)
+        
+        conn.close()
+        
+        # Tạo file Excel trong memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='CCCD_Records', index=False)
+        
+        output.seek(0)
+        
+        # Tạo tên file với timestamp
+        filename = f"cccd_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    
+    except Exception as e:
+        logger.error(f"Lỗi khi export Excel: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'export_error',
+            'message': f'Lỗi khi export Excel: {str(e)}'
+        }), 500
+
+# Thêm endpoint để export ảnh ra file ZIP
+@app.route('/exportImages')
+def export_images():
+    try:
+        # Lấy danh sách tất cả file ảnh trong thư mục upload
+        image_files = []
+        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                image_files.append(filename)
+        
+        if not image_files:
+            return jsonify({
+                'success': False,
+                'error': 'no_images',
+                'message': 'Không có ảnh nào để export'
+            }), 404
+        
+        # Tạo file ZIP trong memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for filename in image_files:
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                zip_file.write(file_path, filename)
+        
+        zip_buffer.seek(0)
+        
+        # Tạo tên file với timestamp
+        filename = f"cccd_images_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
+    
+    except Exception as e:
+        logger.error(f"Lỗi khi export images: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'export_error',
+            'message': f'Lỗi khi export images: {str(e)}'
         }), 500
 
 if __name__ == '__main__':

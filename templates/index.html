@@ -417,6 +417,97 @@
             height: 100%;
         }
 
+        .export-buttons {
+            display: grid;
+            gap: 10px;
+            margin: 15px;
+        }
+
+        .export-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .export-excel {
+            background: linear-gradient(135deg, #217346 0%, #198754 100%);
+            color: white;
+        }
+
+        .export-zip {
+            background: linear-gradient(135deg, #fd7e14 0%, #e8590c 100%);
+            color: white;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .qr-frame-fixed {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            border: 3px solid #00ff00;
+            border-radius: 20px;
+            background: transparent;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .qr-frame-fixed::before,
+        .qr-frame-fixed::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid transparent;
+        }
+
+        .qr-frame-fixed::before {
+            top: -3px;
+            left: -3px;
+            border-top-color: #00ff00;
+            border-left-color: #00ff00;
+        }
+
+        .qr-frame-fixed::after {
+            bottom: -3px;
+            right: -3px;
+            border-bottom-color: #00ff00;
+            border-right-color: #00ff00;
+        }
+
+        .scan-guide {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            width: 100%;
+            padding: 0 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        .camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 12px;
+        }
+
         @media (max-width: 576px) {
             body {
                 font-size: 14px;
@@ -479,6 +570,11 @@
             .record-image {
                 width: 60px;
                 height: 60px;
+            }
+
+            .qr-frame-fixed {
+                width: 220px;
+                height: 220px;
             }
         }
         
@@ -608,12 +704,14 @@
                         </div>
 
                         <div class="flex-grow-1 d-flex flex-column m-2">
-                            <div class="camera-container">
-                                <video id="camera" autoplay playsinline></video>
-                                <div class="overlay qr-overlay">
-                                    <div class="qr-frame">
-                                        <div class="scanning-animation"></div>
-                                        <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
+                            <div class="card flex-grow-1">
+                                <div class="card-body p-0 d-flex flex-column">
+                                    <div class="camera-container">
+                                        <video id="camera" autoplay playsinline class="camera-feed"></video>
+                                        <div class="qr-frame-fixed">
+                                            <div class="scanning-animation"></div>
+                                        </div>
+                                        <div class="scan-guide">
                                             <i class="bi bi-qr-code-scan d-block fs-1 mb-2"></i>
                                             <span class="fw-bold">Đưa mã QR vào khung</span>
                                         </div>
@@ -664,7 +762,7 @@
                             <div class="card flex-grow-1">
                                 <div class="card-body p-0 d-flex flex-column">
                                     <div class="camera-container">
-                                        <video id="camFront" autoplay playsinline></video>
+                                        <video id="camFront" autoplay playsinline class="camera-feed"></video>
                                         <div class="overlay id-overlay">
                                             <div class="id-frame">
                                                 <div class="id-guide">Mặt trước CCCD - AI tự động nhận diện khuôn mặt</div>
@@ -705,7 +803,7 @@
                             <div class="card flex-grow-1">
                                 <div class="card-body p-0 d-flex flex-column">
                                     <div class="camera-container">
-                                        <video id="camBack" autoplay playsinline></video>
+                                        <video id="camBack" autoplay playsinline class="camera-feed"></video>
                                         <div class="overlay id-overlay">
                                             <div class="id-frame">
                                                 <div class="id-guide">Mặt sau CCCD</div>
@@ -788,6 +886,18 @@
                                 <small>Hôm nay</small>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Thêm phần export buttons -->
+                    <div class="export-buttons">
+                        <button class="export-btn export-excel" onclick="exportExcel()">
+                            <i class="bi bi-file-earmark-excel"></i>
+                            Tải Excel
+                        </button>
+                        <button class="export-btn export-zip" onclick="exportImages()">
+                            <i class="bi bi-file-earmark-zip"></i>
+                            Tải Ảnh (ZIP)
+                        </button>
                     </div>
 
                     <div class="p-3">
@@ -1233,7 +1343,8 @@
                         <div class="card-body">
                             <div class="row align-items-center">
                                 <div class="col-3">
-                                    <img src="/uploads/${record.front_image}" class="record-image" alt="Mặt trước">
+                                    <img src="/uploads/${record.front_image}" class="record-image" alt="Mặt trước" 
+                                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZGVlMmU2Ii8+CjxwYXRoIGQ9Ik00MCA0MEM0My4zMTM3IDQwIDQ2IDM3LjMxMzcgNDYgMzRDNDYgMzAuNjg2MyA0My4zMTM3IDI4IDQwIDI4QzM2LjY4NjMgMjggMzQgMzAuNjg2MyAzNCAzNEMzNCAzNy4zMTM3IDM2LjY4NjMgNDAgNDAgNDBaTTQwIDQ0QzMyLjI2IDQ0IDI2IDUwLjI2IDI2IDU4SDU0QzU0IDUwLjI2IDQ3Ljc0IDQ0IDQwIDQ0WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K'">
                                 </div>
                                 <div class="col-6">
                                     <h6 class="card-title mb-1">${record.hoten}</h6>
@@ -1276,6 +1387,93 @@
             }).length;
             
             todayRecords.textContent = todayCount;
+        }
+
+        //---------------------------------------
+        // HÀM EXPORT DỮ LIỆU
+        //---------------------------------------
+        function exportExcel() {
+            const exportBtn = event.target;
+            const originalText = exportBtn.innerHTML;
+            
+            exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang tạo file Excel...';
+            exportBtn.disabled = true;
+            
+            // Hiển thị toast thông báo
+            showToast('Đang tạo file Excel, vui lòng chờ...', 'info');
+            
+            fetch('/exportExcel')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Lỗi khi tải file Excel');
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    // Tạo URL tạm thời và tải file
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `cccd_data_${new Date().toISOString().slice(0,10)}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    showToast('Tải file Excel thành công!', 'success');
+                })
+                .catch(error => {
+                    console.error('Lỗi khi export Excel:', error);
+                    showToast('Lỗi khi tải file Excel: ' + error.message, 'danger');
+                })
+                .finally(() => {
+                    exportBtn.innerHTML = originalText;
+                    exportBtn.disabled = false;
+                });
+        }
+
+        function exportImages() {
+            const exportBtn = event.target;
+            const originalText = exportBtn.innerHTML;
+            
+            exportBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang nén ảnh...';
+            exportBtn.disabled = true;
+            
+            // Hiển thị toast thông báo
+            showToast('Đang nén ảnh, vui lòng chờ...', 'info');
+            
+            fetch('/exportImages')
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.message); });
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    if (blob.size === 0) {
+                        throw new Error('Không có ảnh nào để tải về');
+                    }
+                    
+                    // Tạo URL tạm thời và tải file
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `cccd_images_${new Date().toISOString().slice(0,10)}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    showToast('Tải file ZIP thành công!', 'success');
+                })
+                .catch(error => {
+                    console.error('Lỗi khi export images:', error);
+                    showToast('Lỗi khi tải ảnh: ' + error.message, 'danger');
+                })
+                .finally(() => {
+                    exportBtn.innerHTML = originalText;
+                    exportBtn.disabled = false;
+                });
         }
 
         //---------------------------------------
