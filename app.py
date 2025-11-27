@@ -1,15 +1,11 @@
 import os
 import json
 import base64
+import sqlite3
 import logging
-import zipfile
-import pandas as pd
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
-import io
-import mysql.connector
-from mysql.connector import Error
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -23,35 +19,32 @@ logger = logging.getLogger(__name__)
 # Đảm bảo thư mục upload tồn tại
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Thông tin kết nối MySQL từ Railway
-DB_CONFIG = {
-    'host': 'metro.proxy.rlwy.net',
-    'port': 56134,
-    'user': 'root',
-    'password': 'hYlXTSpFIELiFCpPIpdlklknNdOEDlno',
-    'database': 'railway'
-}
-
-def get_db_connection():
-    """Tạo kết nối đến MySQL database"""
-    try:
-        connection = mysql.connector.connect(**DB_CONFIG)
-        return connection
-    except Error as e:
-        logger.error(f"Lỗi kết nối MySQL: {e}")
-        return None
-
-# Khởi tạo database - kiểm tra kết nối
+# Khởi tạo database
 def init_db():
-    try:
-        conn = get_db_connection()
-        if conn:
-            logger.info("Kết nối MySQL thành công!")
-            conn.close()
-        else:
-            logger.error("Không thể kết nối đến MySQL database")
-    except Exception as e:
-        logger.error(f"Lỗi khởi tạo database: {e}")
+    conn = sqlite3.connect('cccd.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cccd_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            cccd TEXT UNIQUE,
+            cmnd_cu TEXT,
+            hoten TEXT,
+            gioitinh TEXT,
+            ngaysinh TEXT,
+            diachi TEXT,
+            ngaycap TEXT,
+            front_image TEXT,
+            back_image TEXT,
+            face_image TEXT,
+            nguoi_thuc_hien TEXT,
+            email_nguoi_thuc_hien TEXT
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -113,21 +106,14 @@ def save_cccd():
             except Exception as e:
                 logger.error(f"Lỗi khi nhận diện khuôn mặt: {e}")
 
-        # Lưu vào database MySQL
-        conn = get_db_connection()
-        if conn is None:
-            return jsonify({
-                'success': False,
-                'error': 'database_error',
-                'message': 'Không thể kết nối đến cơ sở dữ liệu'
-            }), 500
-
+        # Lưu vào database
+        conn = sqlite3.connect('cccd.db')
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO customer 
-            (timestamp, cccd, cmnd_cu, hoten, gioitinh, ngaysinh, diachi, ngaycap, front_image, back_image, face_image, nguoi_thuc_hien)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO cccd_records 
+            (timestamp, cccd, cmnd_cu, hoten, gioitinh, ngaysinh, diachi, ngaycap, front_image, back_image, face_image, nguoi_thuc_hien, email_nguoi_thuc_hien)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             datetime.now().isoformat(),
             cccd_number,
@@ -140,11 +126,11 @@ def save_cccd():
             front_filename,
             back_filename,
             face_filename,
-            'User'  # nguoi_thuc_hien
+            'User',
+            'user@example.com'
         ))
         
         conn.commit()
-        cursor.close()
         conn.close()
 
         return jsonify({
@@ -251,19 +237,9 @@ def check_duplicate():
 def test_connection():
     try:
         # Kiểm tra kết nối database
-        conn = get_db_connection()
-        if conn is None:
-            return jsonify({
-                'status': 'error',
-                'message': 'Không thể kết nối đến MySQL database',
-                'sheetName': 'customer',
-                'sheetId': 'mysql_database'
-            }), 500
-            
+        conn = sqlite3.connect('cccd.db')
         cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM customer')
-        count = cursor.fetchone()[0]
-        cursor.close()
+        cursor.execute('SELECT COUNT(*) FROM cccd_records')
         conn.close()
         
         # Kiểm tra model YOLO
@@ -275,32 +251,27 @@ def test_connection():
             'folderExists': True,
             'modelStatus': model_status,
             'aiEnabled': face_model is not None,
-            'sheetName': 'customer',
-            'sheetId': 'mysql_database',
-            'recordCount': count
+            'sheetName': 'DATA',
+            'sheetId': 'sqlite_database'
         })
     
     except Exception as e:
         return jsonify({
             'status': 'error',
             'message': str(e),
-            'sheetName': 'customer',
-            'sheetId': 'mysql_database'
+            'sheetName': 'DATA',
+            'sheetId': 'sqlite_database'
         }), 500
 
 def check_duplicate_cccd(cccd_number):
     """Kiểm tra CCCD có trùng không"""
     try:
-        conn = get_db_connection()
-        if conn is None:
-            return False
-
+        conn = sqlite3.connect('cccd.db')
         cursor = conn.cursor()
         
-        cursor.execute('SELECT COUNT(*) FROM customer WHERE cccd = %s', (cccd_number,))
+        cursor.execute('SELECT COUNT(*) FROM cccd_records WHERE cccd = ?', (cccd_number,))
         count = cursor.fetchone()[0]
         
-        cursor.close()
         conn.close()
         return count > 0
     
@@ -335,162 +306,13 @@ def uploaded_file(filename):
 
 @app.route('/health')
 def health_check():
-    conn = get_db_connection()
-    db_status = 'connected' if conn else 'disconnected'
-    if conn:
-        conn.close()
-    
     return jsonify({
         'status': 'healthy', 
         'ai_enabled': face_model is not None,
-        'database': db_status
+        'database': 'connected'
     })
 
-# Thêm endpoint mới để lấy danh sách CCCD đã quét
-@app.route('/getCCCDList', methods=['GET'])
-def get_cccd_list():
-    try:
-        conn = get_db_connection()
-        if conn is None:
-            return jsonify({
-                'success': False,
-                'error': 'database_error',
-                'message': 'Không thể kết nối đến cơ sở dữ liệu'
-            }), 500
 
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT ID, timestamp, cccd, cmnd_cu, hoten, gioitinh, ngaysinh, 
-                   diachi, ngaycap, front_image, back_image, face_image
-            FROM customer 
-            ORDER BY timestamp DESC
-        ''')
-        
-        records = cursor.fetchall()
-        cursor.close()
-        conn.close()
-
-        cccd_list = []
-        for record in records:
-            cccd_list.append({
-                'id': record[0],
-                'timestamp': record[1],
-                'cccd': record[2],
-                'cmnd_cu': record[3],
-                'hoten': record[4],
-                'gioitinh': record[5],
-                'ngaysinh': record[6],
-                'diachi': record[7],
-                'ngaycap': record[8],
-                'front_image': record[9],
-                'back_image': record[10],
-                'face_image': record[11]
-            })
-
-        return jsonify({
-            'success': True,
-            'records': cccd_list
-        })
-    
-    except Exception as e:
-        logger.error(f"Lỗi khi lấy danh sách CCCD: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'server_error',
-            'message': f'Lỗi server: {str(e)}'
-        }), 500
-
-# Thêm endpoint để export dữ liệu ra Excel
-@app.route('/exportExcel')
-def export_excel():
-    try:
-        conn = get_db_connection()
-        if conn is None:
-            return jsonify({
-                'success': False,
-                'error': 'database_error',
-                'message': 'Không thể kết nối đến cơ sở dữ liệu'
-            }), 500
-        
-        # Đọc dữ liệu từ database
-        df = pd.read_sql_query('''
-            SELECT timestamp, cccd, cmnd_cu, hoten, gioitinh, ngaysinh, 
-                   diachi, ngaycap, front_image, back_image, face_image
-            FROM customer 
-            ORDER BY timestamp DESC
-        ''', conn)
-        
-        conn.close()
-        
-        # Tạo file Excel trong memory
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='CCCD_Records', index=False)
-        
-        output.seek(0)
-        
-        # Tạo tên file với timestamp
-        filename = f"cccd_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=filename
-        )
-    
-    except Exception as e:
-        logger.error(f"Lỗi khi export Excel: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'export_error',
-            'message': f'Lỗi khi export Excel: {str(e)}'
-        }), 500
-
-# Thêm endpoint để export ảnh ra file ZIP
-@app.route('/exportImages')
-def export_images():
-    try:
-        # Lấy danh sách tất cả file ảnh trong thư mục upload
-        image_files = []
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-                image_files.append(filename)
-        
-        if not image_files:
-            return jsonify({
-                'success': False,
-                'error': 'no_images',
-                'message': 'Không có ảnh nào để export'
-            }), 404
-        
-        # Tạo file ZIP trong memory
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for filename in image_files:
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                zip_file.write(file_path, filename)
-        
-        zip_buffer.seek(0)
-        
-        # Tạo tên file với timestamp
-        filename = f"cccd_images_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-        
-        return send_file(
-            zip_buffer,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=filename
-        )
-    
-    except Exception as e:
-        logger.error(f"Lỗi khi export images: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'export_error',
-            'message': f'Lỗi khi export images: {str(e)}'
-        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

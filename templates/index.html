@@ -11,6 +11,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     
     <style>
+        /* Giữ nguyên toàn bộ CSS như trước */
         :root {
             --primary: #0d6efd;
             --secondary: #6c757d;
@@ -18,8 +19,6 @@
             --danger: #dc3545;
             --warning: #ffc107;
             --info: #0dcaf0;
-            --light: #f8f9fa;
-            --dark: #212529;
         }
         
         * {
@@ -36,7 +35,7 @@
             height: 100%;
             overflow: hidden;
             font-size: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #f8f9fa;
         }
         
         #app {
@@ -47,37 +46,6 @@
             margin: 0 auto;
             background: white;
             position: relative;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        }
-
-        .app-header {
-            background: linear-gradient(135deg, var(--primary) 0%, #0a58ca 100%);
-            color: white;
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .nav-tabs-custom {
-            background: white;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        .nav-tabs-custom .nav-link {
-            border: none;
-            color: var(--secondary);
-            font-weight: 500;
-            padding: 12px 16px;
-            transition: all 0.3s ease;
-        }
-
-        .nav-tabs-custom .nav-link.active {
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
-            background: transparent;
-        }
-
-        .nav-tabs-custom .nav-link i {
-            margin-right: 8px;
         }
         
         .camera-container {
@@ -88,226 +56,145 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 12px;
-            margin: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         
         video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            border-radius: 12px;
-            z-index: 1;
         }
         
-        /* FIXED QR OVERLAY STYLES */
-        .qr-overlay {
+        .overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 10;
-            border-radius: 12px;
-            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            z-index: 2;
         }
         
-        .qr-frame-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 250px;
-            height: 250px;
-            z-index: 20;
+        .qr-overlay {
+            background: radial-gradient(
+                circle,
+                transparent 0%,
+                rgba(0, 0, 0, 0.6) 100%
+            );
         }
         
         .qr-frame {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            border: 2px solid #00ff00;
-            border-radius: 12px;
-            background: transparent;
-            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.7);
-            overflow: hidden;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 95%;
+            height: 95%;
+            max-width: 400px;
+            max-height: 400px;
+            border: 3px solid var(--success);
+            border-radius: 20px;
+            box-shadow: 
+                0 0 0 9999px rgba(0, 0, 0, 0.6),
+                0 0 30px rgba(255, 255, 255, 0.4) inset;
+        }
+        
+        .qr-frame::before, .qr-frame::after {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 3px solid transparent;
         }
         
         .qr-frame::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border: 2px solid rgba(0, 255, 0, 0.3);
-            border-radius: 10px;
-            pointer-events: none;
-        }
-        
-        .corner {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #00ff00;
-        }
-        
-        .corner-tl {
             top: -3px;
             left: -3px;
-            border-right: none;
-            border-bottom: none;
-            border-top-left-radius: 8px;
+            border-top-color: var(--success);
+            border-left-color: var(--success);
         }
         
-        .corner-tr {
-            top: -3px;
-            right: -3px;
-            border-left: none;
-            border-bottom: none;
-            border-top-right-radius: 8px;
-        }
-        
-        .corner-bl {
-            bottom: -3px;
-            left: -3px;
-            border-right: none;
-            border-top: none;
-            border-bottom-left-radius: 8px;
-        }
-        
-        .corner-br {
+        .qr-frame::after {
             bottom: -3px;
             right: -3px;
-            border-left: none;
-            border-top: none;
-            border-bottom-right-radius: 8px;
+            border-bottom-color: var(--success);
+            border-right-color: var(--success);
         }
         
-        .scanning-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, #00ff00, transparent);
-            animation: scanLine 2s linear infinite;
-            z-index: 15;
-            border-radius: 3px;
-        }
-        
-        @keyframes scanLine {
-            0% { top: 0; }
-            50% { top: 100%; }
-            100% { top: 0; }
-        }
-        
-        .scanning-animation {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80px;
-            height: 80px;
-            border: 2px solid transparent;
-            border-top: 2px solid #00ff00;
-            border-radius: 50%;
-            animation: spin 1.5s linear infinite;
-            z-index: 15;
-        }
-        
-        @keyframes spin {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        
-        /* ID OVERLAY STYLES */
         .id-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10;
-            border-radius: 12px;
-            background: rgba(0, 0, 0, 0.5);
-        }
-        
-        .id-frame-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 70%;
-            z-index: 20;
+            background: radial-gradient(
+                circle,
+                transparent 0%,
+                rgba(0, 0, 0, 0.7) 100%
+            );
         }
         
         .id-frame {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            border: 2px solid var(--warning);
-            border-radius: 12px;
-            background: transparent;
-            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.7);
-            overflow: hidden;
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 80%;
+            border: 3px solid var(--warning);
+            border-radius: 10px;
+            box-shadow: 
+                0 0 0 9999px rgba(0, 0, 0, 0.7),
+                0 0 40px rgba(255, 255, 255, 0.6) inset;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .id-frame::before, .id-frame::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid transparent;
         }
         
         .id-frame::before {
-            content: '';
+            top: -3px;
+            left: -3px;
+            border-top-color: var(--warning);
+            border-left-color: var(--warning);
+        }
+        
+        .id-frame::after {
+            bottom: -3px;
+            right: -3px;
+            border-bottom-color: var(--warning);
+            border-right-color: var(--warning);
+        }
+        
+        .face-frame {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border: 2px solid rgba(255, 193, 7, 0.3);
-            border-radius: 10px;
+            bottom: 15%;
+            left: 10%;
+            width: 25%;
+            height: 30%;
+            border: 2px dashed #00ff00;
+            border-radius: 5px;
+            background: rgba(0, 255, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             pointer-events: none;
+            z-index: 3;
         }
         
-        .id-corner {
+        .face-frame::after {
+            content: 'Khuôn mặt (Tự động nhận diện)';
             position: absolute;
-            width: 20px;
-            height: 20px;
-            border: 3px solid var(--warning);
-        }
-        
-        .id-corner-tl {
-            top: -3px;
-            left: -3px;
-            border-right: none;
-            border-bottom: none;
-            border-top-left-radius: 8px;
-        }
-        
-        .id-corner-tr {
-            top: -3px;
-            right: -3px;
-            border-left: none;
-            border-bottom: none;
-            border-top-right-radius: 8px;
-        }
-        
-        .id-corner-bl {
-            bottom: -3px;
-            left: -3px;
-            border-right: none;
-            border-top: none;
-            border-bottom-left-radius: 8px;
-        }
-        
-        .id-corner-br {
-            bottom: -3px;
-            right: -3px;
-            border-left: none;
-            border-top: none;
-            border-bottom-right-radius: 8px;
+            bottom: -25px;
+            color: #00ff00;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
         
         .camera-controls-container {
-            padding: 20px 15px;
+            padding: 15px;
             background: white;
             border-top: 1px solid #dee2e6;
         }
@@ -319,7 +206,7 @@
         }
         
         .camera-btn {
-            background: linear-gradient(135deg, var(--primary) 0%, #0a58ca 100%);
+            background-color: var(--primary);
             color: white;
             border: none;
             width: 60px;
@@ -329,13 +216,8 @@
             align-items: center;
             justify-content: center;
             font-size: 1.5rem;
-            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .camera-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.2s;
         }
         
         .camera-btn:active {
@@ -343,31 +225,49 @@
         }
         
         .capture-btn {
-            width: 80px;
-            height: 80px;
+            width: 90px;
+            height: 90px;
             background: white;
-            color: var(--primary);
+            color: #333;
             border: 4px solid var(--primary);
             font-size: 2rem;
         }
         
         .capture-preview {
             width: 100%;
-            border-radius: 12px;
+            border-radius: 8px;
             border: 2px solid #dee2e6;
             display: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         
         .capture-preview.show {
             display: block;
         }
         
+        .scanning-animation {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150px;
+            height: 150px;
+            border: 2px solid transparent;
+            border-top: 2px solid var(--success);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            z-index: 3;
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
         .step-circle {
             width: 35px;
             height: 35px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            background-color: #e9ecef;
             color: #6c757d;
             display: flex;
             align-items: center;
@@ -376,18 +276,16 @@
             margin-bottom: 5px;
             border: 2px solid #e9ecef;
             font-size: 0.9rem;
-            transition: all 0.3s ease;
         }
         
         .step.active .step-circle {
-            background: linear-gradient(135deg, var(--primary) 0%, #0a58ca 100%);
+            background-color: var(--primary);
             border-color: var(--primary);
             color: white;
-            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
         }
         
         .step.completed .step-circle {
-            background: linear-gradient(135deg, var(--success) 0%, #146c43 100%);
+            background-color: var(--success);
             border-color: var(--success);
             color: white;
         }
@@ -404,9 +302,8 @@
         
         .preview-image {
             width: 100%;
-            border-radius: 12px;
-            border: 2px solid #dee2e6;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
         }
         
         .id-guide {
@@ -418,24 +315,10 @@
             color: white;
             font-weight: bold;
             width: 100%;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             padding: 0 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            z-index: 25;
-        }
-        
-        .scan-guide {
-            position: absolute;
-            bottom: 20%;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            color: white;
-            font-weight: bold;
-            width: 100%;
-            padding: 0 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            z-index: 30;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            z-index: 4;
         }
         
         .content-area {
@@ -443,110 +326,55 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            background: var(--light);
         }
         
         .btn-success {
-            background: linear-gradient(135deg, var(--success) 0%, #146c43 100%);
-            border: none;
-            box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+            background-color: var(--success);
+            border-color: var(--success);
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, #0a58ca 100%);
-            border: none;
-            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .header-mobile {
+            padding: 12px 15px;
         }
         
         .header-title {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             margin-bottom: 2px;
-            font-weight: 600;
         }
         
         .header-subtitle {
-            font-size: 0.85rem;
-            opacity: 0.9;
+            font-size: 0.8rem;
+            opacity: 0.8;
         }
-
-        .record-card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 15px;
-            transition: transform 0.3s ease;
-        }
-
-        .record-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .record-image {
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-            border: 2px solid #dee2e6;
-        }
-
-        .face-detected-badge {
-            background: var(--success);
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-        }
-
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
+        
+        .model-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
             display: flex;
             flex-direction: column;
-            height: 100%;
-        }
-
-        .export-buttons {
-            display: grid;
-            gap: 10px;
-            margin: 15px;
-        }
-
-        .export-btn {
-            display: flex;
-            align-items: center;
             justify-content: center;
-            gap: 8px;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .export-excel {
-            background: linear-gradient(135deg, #217346 0%, #198754 100%);
+            align-items: center;
+            z-index: 1000;
             color: white;
         }
-
-        .export-zip {
-            background: linear-gradient(135deg, #fd7e14 0%, #e8590c 100%);
-            color: white;
-        }
-
-        .export-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        
+        .model-loading .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
         }
 
         @media (max-width: 576px) {
@@ -555,11 +383,11 @@
             }
             
             .header-title {
-                font-size: 1.1rem;
+                font-size: 1rem;
             }
             
             .header-subtitle {
-                font-size: 0.8rem;
+                font-size: 0.75rem;
             }
             
             .step-circle {
@@ -579,8 +407,8 @@
             }
             
             .capture-btn {
-                width: 70px;
-                height: 70px;
+                width: 80px;
+                height: 80px;
                 font-size: 1.8rem;
             }
             
@@ -594,28 +422,26 @@
                 bottom: 10%;
             }
             
-            .qr-frame-container {
-                width: 220px;
-                height: 220px;
+            .qr-frame {
+                width: 90%;
+                height: 90%;
+                max-width: 350px;
+                max-height: 350px;
             }
             
-            .id-frame-container {
-                width: 85%;
-                height: 65%;
+            .face-frame {
+                bottom: 12%;
+                left: 8%;
+                width: 28%;
+                height: 32%;
             }
             
             .camera-controls-container {
-                padding: 15px 10px;
+                padding: 10px;
             }
             
             .camera-container {
                 height: 45vh;
-                margin: 8px;
-            }
-
-            .record-image {
-                width: 60px;
-                height: 60px;
             }
         }
         
@@ -624,63 +450,43 @@
         }
         
         .content-area::-webkit-scrollbar {
-            width: 6px;
+            width: 4px;
         }
         
         .content-area::-webkit-scrollbar-track {
             background: #f1f1f1;
-            border-radius: 3px;
         }
         
         .content-area::-webkit-scrollbar-thumb {
             background: #c1c1c1;
-            border-radius: 3px;
+            border-radius: 2px;
         }
         
         .action-buttons {
             display: grid;
-            gap: 12px;
-            padding: 15px;
+            gap: 10px;
         }
         
         .success-message {
             margin: 15px;
-            border-radius: 12px;
         }
-
-        .ai-status-badge {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
+        
+        .ai-status {
             font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--secondary);
-        }
-
-        .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            opacity: 0.5;
         }
     </style>
 </head>
 <body>
     <div id="app">
         <!-- Header -->
-        <div class="app-header">
+        <div class="bg-primary text-white shadow-sm header-mobile">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1 class="header-title mb-0">
                         <i class="bi bi-person-badge me-2"></i>
                         QUÉT CCCD
                     </h1>
-                    <div class="header-subtitle">Hệ thống quét và quản lý CCCD thông minh</div>
+                    <div class="header-subtitle">Quét mã QR và chụp ảnh CCCD tự động - AI nhận diện khuôn mặt</div>
                 </div>
                 <div class="badge bg-light text-primary" id="connectionStatus">
                     <i class="bi bi-circle-fill me-1"></i>
@@ -689,82 +495,48 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs -->
-        <div class="nav-tabs-custom">
-            <ul class="nav nav-tabs nav-justified" id="mainTabs">
-                <li class="nav-item">
-                    <a class="nav-link active" id="scan-tab" data-bs-toggle="tab" href="#scan-content">
-                        <i class="bi bi-qr-code-scan"></i>
-                        Quét CCCD
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" id="records-tab" data-bs-toggle="tab" href="#records-content">
-                        <i class="bi bi-list-check"></i>
-                        Danh sách đã quét
-                        <span class="badge bg-primary ms-1" id="recordsCount">0</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Tab Content -->
-        <div class="tab-content flex-grow-1">
-            <!-- Tab 1: Quét CCCD -->
-            <div class="tab-pane fade show active" id="scan-content">
-                <!-- Step Indicator -->
-                <div class="bg-white border-bottom shadow-sm">
-                    <div class="container">
-                        <div class="row g-0 text-center py-2">
-                            <div class="col-3 step active" id="step1">
-                                <div class="step-circle mx-auto">1</div>
-                                <div class="small fw-medium step-label">Quét QR</div>
-                            </div>
-                            <div class="col-3 step" id="step2">
-                                <div class="step-circle mx-auto">2</div>
-                                <div class="small fw-medium step-label">Mặt trước</div>
-                            </div>
-                            <div class="col-3 step" id="step3">
-                                <div class="step-circle mx-auto">3</div>
-                                <div class="small fw-medium step-label">Mặt sau</div>
-                            </div>
-                            <div class="col-3 step" id="step4">
-                                <div class="step-circle mx-auto">4</div>
-                                <div class="small fw-medium step-label">Xác nhận</div>
-                            </div>
-                        </div>
+        <!-- Step Indicator -->
+        <div class="bg-white border-bottom shadow-sm">
+            <div class="container">
+                <div class="row g-0 text-center py-2">
+                    <div class="col-3 step active" id="step1">
+                        <div class="step-circle mx-auto">1</div>
+                        <div class="small fw-medium step-label">Quét QR</div>
+                    </div>
+                    <div class="col-3 step" id="step2">
+                        <div class="step-circle mx-auto">2</div>
+                        <div class="small fw-medium step-label">Mặt trước</div>
+                    </div>
+                    <div class="col-3 step" id="step3">
+                        <div class="step-circle mx-auto">3</div>
+                        <div class="small fw-medium step-label">Mặt sau</div>
+                    </div>
+                    <div class="col-3 step" id="step4">
+                        <div class="step-circle mx-auto">4</div>
+                        <div class="small fw-medium step-label">Xác nhận</div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="content-area">
-                    <!-- Màn hình 1: Quét QR -->
-                    <div class="screen active" id="scanScreen">
-                        <div class="alert alert-info d-flex align-items-center m-3 mb-2">
-                            <i class="bi bi-info-circle-fill me-2"></i>
-                            <span class="small">Đưa mã QR CCCD vào khung hình để quét tự động</span>
-                        </div>
+        <!-- Main Content -->
+        <div class="content-area">
+            <!-- Màn hình 1: Quét QR -->
+            <div class="screen active" id="scanScreen">
+                <div class="alert alert-info d-flex align-items-center m-2 mb-0">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <span class="small">Đưa mã QR CCCD vào khung hình để quét tự động</span>
+                </div>
 
-                        <div class="flex-grow-1 d-flex flex-column m-2">
-                            <div class="card flex-grow-1">
-                                <div class="card-body p-0 d-flex flex-column">
-                                    <div class="camera-container">
-                                        <video id="camera" autoplay playsinline class="camera-feed"></video>
-                                        
-                                        <!-- Overlay cho QR code - FIXED VERSION -->
-                                        <div class="qr-overlay">
-                                            <div class="qr-frame-container">
-                                                <div class="qr-frame">
-                                                    <div class="corner corner-tl"></div>
-                                                    <div class="corner corner-tr"></div>
-                                                    <div class="corner corner-bl"></div>
-                                                    <div class="corner corner-br"></div>
-                                                    <div class="scanning-line"></div>
-                                                    <div class="scanning-animation"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="scan-guide">
+                <div class="flex-grow-1 d-flex flex-column m-2">
+                    <div class="card flex-grow-1">
+                        <div class="card-body p-0 d-flex flex-column">
+                            <div class="camera-container">
+                                <video id="camera" autoplay playsinline></video>
+                                <div class="overlay qr-overlay">
+                                    <div class="qr-frame">
+                                        <div class="scanning-animation"></div>
+                                        <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
                                             <i class="bi bi-qr-code-scan d-block fs-1 mb-2"></i>
                                             <span class="fw-bold">Đưa mã QR vào khung</span>
                                         </div>
@@ -772,215 +544,156 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="row m-3">
-                            <div class="col">
-                                <div class="card text-center">
-                                    <div class="card-body py-2">
-                                        <small class="text-muted">
-                                            <i class="bi bi-clock me-1"></i>
-                                            <span id="scanTime">Thời gian: 0s</span>
-                                        </small>
-                                    </div>
-                                </div>
+                <div class="row m-2">
+                    <div class="col">
+                        <div class="card text-center">
+                            <div class="card-body py-2">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <span id="scanTime">Thời gian: 0s</span>
+                                </small>
                             </div>
-                            <div class="col">
-                                <div class="card text-center">
-                                    <div class="card-body py-2">
-                                        <small class="text-muted">
-                                            <i class="bi bi-arrow-repeat me-1"></i>
-                                            <span id="scanAttempts">Lần quét: 0</span>
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="m-3">
-                            <button class="btn btn-outline-primary w-100" onclick="forceScan()" id="forceScanBtn">
-                                <i class="bi bi-qr-code-scan me-2"></i>
-                                Quét Thủ Công
-                            </button>
                         </div>
                     </div>
-
-                    <!-- Màn hình 2: Chụp mặt trước -->
-                    <div class="screen" id="frontScreen">
-                        <div class="alert alert-warning d-flex align-items-center m-3 mb-2">
-                            <i class="bi bi-camera me-2"></i>
-                            <span class="small">Đưa mặt trước CCCD vào khung. Hệ thống sẽ tự động nhận diện khuôn mặt bằng AI.</span>
+                    <div class="col">
+                        <div class="card text-center">
+                            <div class="card-body py-2">
+                                <small class="text-muted">
+                                    <i class="bi bi-arrow-repeat me-1"></i>
+                                    <span id="scanAttempts">Lần quét: 0</span>
+                                </small>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="flex-grow-1 d-flex flex-column m-2">
-                            <div class="card flex-grow-1">
-                                <div class="card-body p-0 d-flex flex-column">
-                                    <div class="camera-container">
-                                        <video id="camFront" autoplay playsinline class="camera-feed"></video>
-                                        
-                                        <!-- Overlay cho mặt trước CCCD -->
-                                        <div class="id-overlay">
-                                            <div class="id-frame-container">
-                                                <div class="id-frame">
-                                                    <div class="id-corner id-corner-tl"></div>
-                                                    <div class="id-corner id-corner-tr"></div>
-                                                    <div class="id-corner id-corner-bl"></div>
-                                                    <div class="id-corner id-corner-br"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
+                <div class="m-2">
+                    <button class="btn btn-outline-primary w-100" onclick="forceScan()" id="forceScanBtn">
+                        <i class="bi bi-qr-code-scan me-2"></i>
+                        Quét Thủ Công
+                    </button>
+                </div>
+            </div>
+
+            <!-- Màn hình 2: Chụp mặt trước -->
+            <div class="screen" id="frontScreen">
+                <div class="alert alert-warning d-flex align-items-center m-2 mb-0">
+                    <i class="bi bi-camera me-2"></i>
+                    <span class="small">Đưa mặt trước CCCD vào khung. Hệ thống sẽ tự động nhận diện khuôn mặt bằng AI.</span>
+                </div>
+
+                <div class="flex-grow-1 d-flex flex-column m-2">
+                    <div class="card flex-grow-1">
+                        <div class="card-body p-0 d-flex flex-column">
+                            <div class="camera-container">
+                                <video id="camFront" autoplay playsinline></video>
+                                <div class="overlay id-overlay">
+                                    <div class="id-frame">
+                                        <div class="face-frame"></div>
                                         <div class="id-guide">Mặt trước CCCD - AI tự động nhận diện khuôn mặt</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="camera-controls-container">
-                            <div class="camera-controls">
-                                <button class="camera-btn" id="torchBtn" title="Bật đèn flash">
-                                    <i class="bi bi-brightness-high"></i>
-                                </button>
-                                <button class="camera-btn capture-btn" onclick="captureInFrame('front')" title="Chụp ảnh">
-                                    <i class="bi bi-camera-fill"></i>
-                                </button>
-                                <button class="camera-btn" id="focusBtn" title="Lấy nét">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="m-3">
-                            <img id="imgFront" class="capture-preview img-fluid">
-                        </div>
                     </div>
+                </div>
 
-                    <!-- Màn hình 3: Chụp mặt sau -->
-                    <div class="screen" id="backScreen">
-                        <div class="alert alert-warning d-flex align-items-center m-3 mb-2">
-                            <i class="bi bi-camera me-2"></i>
-                            <span class="small">Lật CCCD và đưa mặt sau vào khung. Đảm bảo thông tin rõ nét.</span>
-                        </div>
+                <div class="camera-controls-container">
+                    <div class="camera-controls">
+                        <button class="camera-btn" id="torchBtn" title="Bật đèn flash">
+                            <i class="bi bi-brightness-high"></i>
+                        </button>
+                        <button class="camera-btn capture-btn" onclick="captureInFrame('front')" title="Chụp ảnh">
+                            <i class="bi bi-camera-fill"></i>
+                        </button>
+                        <button class="camera-btn" id="focusBtn" title="Lấy nét">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                </div>
 
-                        <div class="flex-grow-1 d-flex flex-column m-2">
-                            <div class="card flex-grow-1">
-                                <div class="card-body p-0 d-flex flex-column">
-                                    <div class="camera-container">
-                                        <video id="camBack" autoplay playsinline class="camera-feed"></video>
-                                        
-                                        <!-- Overlay cho mặt sau CCCD -->
-                                        <div class="id-overlay">
-                                            <div class="id-frame-container">
-                                                <div class="id-frame">
-                                                    <div class="id-corner id-corner-tl"></div>
-                                                    <div class="id-corner id-corner-tr"></div>
-                                                    <div class="id-corner id-corner-bl"></div>
-                                                    <div class="id-corner id-corner-br"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
+                <div class="m-2">
+                    <img id="imgFront" class="capture-preview img-fluid">
+                </div>
+            </div>
+
+            <!-- Màn hình 3: Chụp mặt sau -->
+            <div class="screen" id="backScreen">
+                <div class="alert alert-warning d-flex align-items-center m-2 mb-0">
+                    <i class="bi bi-camera me-2"></i>
+                    <span class="small">Lật CCCD và đưa mặt sau vào khung. Đảm bảo thông tin rõ nét.</span>
+                </div>
+
+                <div class="flex-grow-1 d-flex flex-column m-2">
+                    <div class="card flex-grow-1">
+                        <div class="card-body p-0 d-flex flex-column">
+                            <div class="camera-container">
+                                <video id="camBack" autoplay playsinline></video>
+                                <div class="overlay id-overlay">
+                                    <div class="id-frame">
                                         <div class="id-guide">Mặt sau CCCD</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="camera-controls-container">
-                            <div class="camera-controls">
-                                <button class="camera-btn" id="torchBtnBack" title="Bật đèn flash">
-                                    <i class="bi bi-brightness-high"></i>
-                                </button>
-                                <button class="camera-btn capture-btn" onclick="captureInFrame('back')" title="Chụp ảnh">
-                                    <i class="bi bi-camera-fill"></i>
-                                </button>
-                                <button class="camera-btn" id="focusBtnBack" title="Lấy nét">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="m-3">
-                            <img id="imgBack" class="capture-preview img-fluid">
-                        </div>
                     </div>
+                </div>
 
-                    <!-- Màn hình 4: Xác nhận thông tin -->
-                    <div class="screen" id="infoScreen">
-                        <div id="successMessageContainer"></div>
-                        
-                        <div class="alert alert-success d-flex align-items-center m-3">
-                            <i class="bi bi-check-circle-fill me-2"></i>
-                            <span class="small">Kiểm tra và xác nhận thông tin trước khi lưu</span>
-                        </div>
-
-                        <div class="m-3">
-                            <div class="card mb-3">
-                                <div class="card-header bg-primary text-white py-2">
-                                    <i class="bi bi-person-badge me-2"></i>
-                                    Thông tin CCCD
-                                </div>
-                                <div class="card-body p-3" id="preview">
-                                    <!-- Thông tin sẽ được hiển thị ở đây -->
-                                </div>
-                            </div>
-
-                            <div class="row mb-3" id="imagePreviews">
-                                <!-- Ảnh preview sẽ được hiển thị ở đây -->
-                            </div>
-
-                            <div class="action-buttons" id="actionButtons">
-                                <button class="btn btn-success btn-lg" onclick="saveData()" id="saveButton">
-                                    <i class="bi bi-check-circle me-2"></i>
-                                    Lưu Thông Tin
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="resetApp()">
-                                    <i class="bi bi-arrow-repeat me-2"></i>
-                                    Quét Lại
-                                </button>
-                            </div>
-                        </div>
+                <div class="camera-controls-container">
+                    <div class="camera-controls">
+                        <button class="camera-btn" id="torchBtnBack" title="Bật đèn flash">
+                            <i class="bi bi-brightness-high"></i>
+                        </button>
+                        <button class="camera-btn capture-btn" onclick="captureInFrame('back')" title="Chụp ảnh">
+                            <i class="bi bi-camera-fill"></i>
+                        </button>
+                        <button class="camera-btn" id="focusBtnBack" title="Lấy nét">
+                            <i class="bi bi-eye"></i>
+                        </button>
                     </div>
+                </div>
+
+                <div class="m-2">
+                    <img id="imgBack" class="capture-preview img-fluid">
                 </div>
             </div>
 
-            <!-- Tab 2: Danh sách đã quét -->
-            <div class="tab-pane fade" id="records-content">
-                <div class="content-area">
-                    <div class="stats-card">
-                        <div class="row text-center">
-                            <div class="col-6">
-                                <div class="h4 mb-1" id="totalRecords">0</div>
-                                <small>Tổng số CCCD</small>
-                            </div>
-                            <div class="col-6">
-                                <div class="h4 mb-1" id="todayRecords">0</div>
-                                <small>Hôm nay</small>
-                            </div>
+            <!-- Màn hình 4: Xác nhận thông tin -->
+            <div class="screen" id="infoScreen">
+                <div id="successMessageContainer"></div>
+                
+                <div class="alert alert-success d-flex align-items-center m-2">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <span class="small">Kiểm tra và xác nhận thông tin trước khi lưu</span>
+                </div>
+
+                <div class="m-2">
+                    <div class="card mb-2">
+                        <div class="card-header bg-primary text-white py-2">
+                            <i class="bi bi-person-badge me-2"></i>
+                            Thông tin CCCD
+                        </div>
+                        <div class="card-body p-2" id="preview">
+                            <!-- Thông tin sẽ được hiển thị ở đây -->
                         </div>
                     </div>
 
-                    <!-- Thêm phần export buttons -->
-                    <div class="export-buttons">
-                        <button class="export-btn export-excel" onclick="exportExcel()">
-                            <i class="bi bi-file-earmark-excel"></i>
-                            Tải Excel
-                        </button>
-                        <button class="export-btn export-zip" onclick="exportImages()">
-                            <i class="bi bi-file-earmark-zip"></i>
-                            Tải Ảnh (ZIP)
-                        </button>
+                    <div class="row mb-2" id="imagePreviews">
+                        <!-- Ảnh preview sẽ được hiển thị ở đây -->
                     </div>
 
-                    <div class="p-3">
-                        <h5 class="mb-3">Danh sách CCCD đã quét</h5>
-                        <div id="recordsList">
-                            <!-- Danh sách records sẽ được load ở đây -->
-                            <div class="empty-state">
-                                <i class="bi bi-inbox"></i>
-                                <p>Chưa có dữ liệu CCCD</p>
-                                <small class="text-muted">Quét CCCD mới để xem danh sách ở đây</small>
-                            </div>
-                        </div>
+                    <div class="action-buttons" id="actionButtons">
+                        <button class="btn btn-success btn-lg" onclick="saveData()" id="saveButton">
+                            <i class="bi bi-check-circle me-2"></i>
+                            Lưu Thông Tin
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="resetApp()">
+                            <i class="bi bi-arrow-repeat me-2"></i>
+                            Quét Lại
+                        </button>
                     </div>
                 </div>
             </div>
@@ -988,7 +701,7 @@
     </div>
 
     <!-- Toast for notifications -->
-    <div class="toast-container position-fixed top-0 end-0 p-3">
+    <div class="toast-container position-fixed top-0 end-0 p-2">
         <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header">
                 <i class="bi bi-info-circle text-primary me-2"></i>
@@ -1016,20 +729,18 @@
         let isScanning = false;
         let toast = null;
         let successTimeout = null;
-        let allRecords = [];
 
         // Khởi tạo toast
         document.addEventListener('DOMContentLoaded', function() {
             toast = new bootstrap.Toast(document.getElementById('liveToast'));
             initializeApp();
-            loadRecords();
         });
 
         // Khởi động ứng dụng
         async function initializeApp() {
             console.log("Đang khởi động ứng dụng...");
             
-            await initializeCamera();
+            initializeCamera();
             testConnection();
             
             // Thêm event listeners
@@ -1042,7 +753,7 @@
         }
 
         //---------------------------------------
-        // LUỒNG XỬ LÝ CHÍNH
+        // LUỒNG XỬ LÝ CHÍNH - ĐÃ BỎ CẮT KHUÔN MẶT THỦ CÔNG
         //---------------------------------------
         async function handleQRScanSuccess(code) {
             clearInterval(scanInterval);
@@ -1083,10 +794,21 @@
         //---------------------------------------
         function checkDuplicateCCCD(cccdNumber) {
             return new Promise((resolve, reject) => {
-                // Giả lập kiểm tra trùng
-                setTimeout(() => {
-                    resolve(false);
-                }, 500);
+                fetch('/checkDuplicate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ cccd: cccdNumber })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    resolve(data.duplicate);
+                })
+                .catch(error => {
+                    console.error("Lỗi kiểm tra trùng CCCD:", error);
+                    reject(error);
+                });
             });
         }
 
@@ -1106,20 +828,13 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 currentStream = stream;
                 
-                const camera = document.getElementById("camera");
-                const camFront = document.getElementById("camFront");
-                const camBack = document.getElementById("camBack");
+                document.getElementById("camera").srcObject = stream;
+                document.getElementById("camFront").srcObject = stream;
+                document.getElementById("camBack").srcObject = stream;
                 
-                camera.srcObject = stream;
-                camFront.srcObject = stream;
-                camBack.srcObject = stream;
-                
-                // Đảm bảo video đã tải
-                await new Promise((resolve) => {
-                    camera.onloadedmetadata = () => {
-                        resolve();
-                    };
-                });
+                setTimeout(() => {
+                    applyQRZoom();
+                }, 1000);
                 
                 startAutoScan();
                 
@@ -1140,7 +855,7 @@
             if (capabilities.zoom) {
                 try {
                     await track.applyConstraints({
-                        advanced: [{ zoom: 1.5 }]
+                        advanced: [{ zoom: 3 }]
                     });
                 } catch (err) {
                     console.error("Lỗi khi áp dụng zoom: ", err);
@@ -1267,10 +982,10 @@
             const videoHeight = video.videoHeight;
             
             // KHUNG CHỤP CHÍNH XÁC - chiếm 80% chiều rộng và 80% chiều cao, căn giữa
-            const frameX = videoWidth * 0.1;
-            const frameY = videoHeight * 0.1;
-            const frameWidth = videoWidth * 0.8;
-            const frameHeight = videoHeight * 0.8;
+            const frameX = videoWidth * 0.1;    // 10% từ trái
+            const frameY = videoHeight * 0.1;   // 10% từ trên
+            const frameWidth = videoWidth * 0.8;  // 80% chiều rộng
+            const frameHeight = videoHeight * 0.8; // 80% chiều cao
             
             canvas.width = frameWidth;
             canvas.height = frameHeight;
@@ -1347,12 +1062,7 @@
             
             let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
-            if (typeof jsQR !== 'undefined') {
-                return jsQR(imageData.data, canvas.width, canvas.height);
-            } else {
-                console.error("jsQR library not loaded");
-                return null;
-            }
+            return jsQR(imageData.data, canvas.width, canvas.height);
         }
 
         function forceScan() {
@@ -1364,101 +1074,6 @@
             } else {
                 showToast("Không tìm thấy QR code. Thử lại!", "warning");
             }
-        }
-
-        //---------------------------------------
-        // QUẢN LÝ DANH SÁCH CCCD ĐÃ QUÉT
-        //---------------------------------------
-        function loadRecords() {
-            setTimeout(() => {
-                allRecords = [];
-                displayRecords(allRecords);
-                updateStats();
-            }, 500);
-        }
-
-        function displayRecords(records) {
-            const container = document.getElementById("recordsList");
-            const recordsCount = document.getElementById("recordsCount");
-            
-            recordsCount.textContent = records.length;
-            
-            if (records.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="bi bi-inbox"></i>
-                        <p>Chưa có dữ liệu CCCD</p>
-                        <small class="text-muted">Quét CCCD mới để xem danh sách ở đây</small>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
-            records.forEach(record => {
-                const date = new Date(record.timestamp);
-                const formattedDate = date.toLocaleDateString('vi-VN');
-                const formattedTime = date.toLocaleTimeString('vi-VN');
-                
-                html += `
-                    <div class="card record-card">
-                        <div class="card-body">
-                            <div class="row align-items-center">
-                                <div class="col-3">
-                                    <img src="/uploads/${record.front_image}" class="record-image" alt="Mặt trước" 
-                                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZGVlMmU2Ii8+CjxwYXRoIGQ9Ik00MCA0MEM0My4zMTM3IDQwIDQ2IDM3LjMxMzcgNDYgMzRDNDYgMzAuNjg2MyA0My4zMTM3IDI4IDQwIDI4QzM2LjY4NjMgMjggMzQgMzAuNjg2MyAzNCAzNEMzNCAzNy4zMTM3IDM2LjY4NjMgNDAgNDAgNDBaTTQwIDQ0QzMyLjI2IDQ0IDI2IDUwLjI2IDI2IDU4SDU0QzU0IDUwLjI2IDQ3Ljc0IDQ0IDQwIDQ0WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K'">
-                                </div>
-                                <div class="col-6">
-                                    <h6 class="card-title mb-1">${record.hoten}</h6>
-                                    <p class="card-text mb-1">
-                                        <small class="text-muted">CCCD: ${record.cccd}</small>
-                                    </p>
-                                    <p class="card-text mb-1">
-                                        <small class="text-muted">${record.gioitinh} - ${record.ngaysinh}</small>
-                                    </p>
-                                    <p class="card-text mb-0">
-                                        <small class="text-muted">${formattedDate} ${formattedTime}</small>
-                                    </p>
-                                </div>
-                                <div class="col-3 text-end">
-                                    ${record.face_image ? 
-                                        '<span class="face-detected-badge"><i class="bi bi-check-circle me-1"></i>Đã nhận diện</span>' : 
-                                        '<span class="badge bg-secondary">Chưa nhận diện</span>'
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }
-
-        function updateStats() {
-            const totalRecords = document.getElementById("totalRecords");
-            const todayRecords = document.getElementById("todayRecords");
-            
-            totalRecords.textContent = allRecords.length;
-            
-            const today = new Date().toDateString();
-            const todayCount = allRecords.filter(record => {
-                const recordDate = new Date(record.timestamp).toDateString();
-                return recordDate === today;
-            }).length;
-            
-            todayRecords.textContent = todayCount;
-        }
-
-        //---------------------------------------
-        // HÀM EXPORT DỮ LIỆU
-        //---------------------------------------
-        function exportExcel() {
-            showToast("Chức năng export Excel đang được phát triển", "info");
-        }
-
-        function exportImages() {
-            showToast("Chức năng export ảnh đang được phát triển", "info");
         }
 
         //---------------------------------------
@@ -1611,6 +1226,7 @@
                 ngaycap: qrData.ngaycap,
                 front: extractBase64Data(frontImg),
                 back: extractBase64Data(backImg)
+                // KHÔNG gửi ảnh khuôn mặt - server sẽ tự động nhận diện
             };
 
             const saveBtn = document.getElementById("saveButton");
@@ -1618,10 +1234,36 @@
             saveBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang lưu và nhận diện khuôn mặt...';
             saveBtn.disabled = true;
 
-            setTimeout(() => {
-                showSuccessMessage("Lưu thông tin thành công! Đã nhận diện khuôn mặt bằng AI.");
-                loadRecords();
-            }, 2000);
+            fetch('/saveCCCD', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(postData)
+            })
+            .then(response => response.json())
+            .then(res => {
+                if (res.success) {
+                    if (res.face_detected) {
+                        showSuccessMessage("Lưu thông tin thành công! Đã nhận diện khuôn mặt bằng AI.");
+                    } else {
+                        showSuccessMessage("Lưu thông tin thành công! Không tìm thấy khuôn mặt trong ảnh.");
+                    }
+                } else {
+                    saveBtn.innerHTML = originalText;
+                    saveBtn.disabled = false;
+                    if (res.error === "duplicate") {
+                        showToast(`Số CCCD ${res.duplicateCCCD} đã tồn tại trong hệ thống! Vui lòng kiểm tra lại.`, "danger");
+                    } else {
+                        showToast("Lỗi: " + res.message, "danger");
+                    }
+                }
+            })
+            .catch(err => {
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+                showToast("Lỗi kết nối: " + err.toString(), "danger");
+            });
         }
 
         function showSuccessMessage(message = "Lưu thông tin thành công!") {
@@ -1666,6 +1308,7 @@
             document.getElementById("successMessageContainer").innerHTML = '';
             document.getElementById("actionButtons").style.display = 'grid';
             
+            applyQRZoom();
             showScreen('scanScreen');
             updateStepIndicator(1);
             startAutoScan();
@@ -1676,10 +1319,24 @@
         function testConnection() {
             const statusElement = document.getElementById("connectionStatus");
             
-            setTimeout(() => {
-                statusElement.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i><span class="d-none d-sm-inline">Đã kết nối - AI Sẵn sàng</span>`;
-                statusElement.className = 'badge bg-success';
-            }, 1000);
+            fetch('/testConnection')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.status === "ok") {
+                        const modelStatus = result.modelStatus === "loaded" ? "AI Sẵn sàng" : "AI Đang tải";
+                        statusElement.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i><span class="d-none d-sm-inline">Đã kết nối - ${modelStatus}</span>`;
+                        statusElement.className = 'badge bg-success';
+                    } else {
+                        statusElement.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i><span class="d-none d-sm-inline">Lỗi kết nối</span>';
+                        statusElement.className = 'badge bg-danger';
+                        showToast("Lỗi kết nối: " + result.message, "danger");
+                    }
+                })
+                .catch(error => {
+                    statusElement.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i><span class="d-none d-sm-inline">Lỗi kết nối</span>';
+                    statusElement.className = 'badge bg-danger';
+                    showToast("Không thể kết nối đến máy chủ!", "danger");
+                });
         }
 
         // Ngăn chặn zoom bằng cử chỉ trên mobile
