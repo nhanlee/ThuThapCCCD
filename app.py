@@ -2,31 +2,22 @@ import os
 import json
 import base64
 import sqlite3
-import cv2
-import numpy as np
+import logging
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
-from ultralytics import YOLO
-import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['UPLOAD_FOLDER'] = 'images'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Đảm bảo thư mục upload tồn tại
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-# Tải model YOLOv8 cho nhận diện khuôn mặt
-try:
-    print("Đang tải model YOLOv8 cho nhận diện khuôn mặt...")
-    face_model = YOLO('yolov8n-face.pt')  # Model chuyên dụng cho khuôn mặt
-    print("Đã tải model YOLOv8 thành công!")
-except Exception as e:
-    print(f"Lỗi khi tải model YOLOv8: {e}")
-    print("Sử dụng model YOLOv8n tiêu chuẩn...")
-    face_model = YOLO('yolov8n.pt')
 
 # Khởi tạo database
 def init_db():
@@ -56,6 +47,17 @@ def init_db():
     conn.close()
 
 init_db()
+
+# Khởi tạo YOLO model (có xử lý lỗi)
+face_model = None
+try:
+    from ultralytics import YOLO
+    logger.info("Đang tải YOLO model...")
+    face_model = YOLO('yolov8n.pt')
+    logger.info("YOLO model đã tải thành công")
+except Exception as e:
+    logger.warning(f"Không thể tải YOLO model: {e}")
+    logger.warning("Ứng dụng sẽ chạy mà không có nhận diện khuôn mặt")
 
 @app.route('/')
 def index():
@@ -90,16 +92,19 @@ def save_cccd():
         
         # Tự động nhận diện và cắt khuôn mặt từ ảnh mặt trước
         face_filename = None
-        if data.get('front'):
+        face_detected = False
+        
+        if data.get('front') and face_model:
             try:
                 face_base64 = detect_and_crop_face(data.get('front'))
                 if face_base64:
                     face_filename = save_image(face_base64, cccd_number + '_face.jpg')
-                    print(f"Đã nhận diện và cắt khuôn mặt thành công cho CCCD: {cccd_number}")
+                    face_detected = True
+                    logger.info(f"Đã nhận diện và cắt khuôn mặt thành công cho CCCD: {cccd_number}")
                 else:
-                    print(f"Không tìm thấy khuôn mặt trong ảnh CCCD: {cccd_number}")
+                    logger.info(f"Không tìm thấy khuôn mặt trong ảnh CCCD: {cccd_number}")
             except Exception as e:
-                print(f"Lỗi khi nhận diện khuôn mặt: {e}")
+                logger.error(f"Lỗi khi nhận diện khuôn mặt: {e}")
 
         # Lưu vào database
         conn = sqlite3.connect('cccd.db')
@@ -121,8 +126,8 @@ def save_cccd():
             front_filename,
             back_filename,
             face_filename,
-            'User',  # Trong thực tế, lấy từ session/login
-            'user@example.com'  # Trong thực tế, lấy từ session/login
+            'User',
+            'user@example.com'
         ))
         
         conn.commit()
@@ -132,11 +137,12 @@ def save_cccd():
             'success': True,
             'message': 'Lưu thành công!',
             'cccd': cccd_number,
-            'face_detected': face_filename is not None
+            'face_detected': face_detected,
+            'ai_enabled': face_model is not None
         })
 
     except Exception as e:
-        print(f"Lỗi server: {str(e)}")
+        logger.error(f"Lỗi server: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'server_error',
@@ -144,10 +150,14 @@ def save_cccd():
         }), 500
 
 def detect_and_crop_face(base64_data):
-    """
-    Nhận diện và cắt khuôn mặt từ ảnh sử dụng YOLOv8
-    """
+    """Nhận diện và cắt khuôn mặt từ ảnh sử dụng YOLOv8"""
+    if not face_model:
+        return None
+        
     try:
+        import cv2
+        import numpy as np
+        
         # Chuyển base64 thành image
         if base64_data.startswith('data:image'):
             base64_data = base64_data.split(',')[1]
@@ -157,14 +167,11 @@ def detect_and_crop_face(base64_data):
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         if img is None:
-            print("Không thể decode ảnh")
+            logger.error("Không thể decode ảnh")
             return None
         
-        # Chuyển đổi màu từ BGR sang RGB
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
         # Nhận diện khuôn mặt với YOLOv8
-        results = face_model(img_rgb, verbose=False)
+        results = face_model(img, verbose=False)
         
         # Tìm khuôn mặt có độ tin cậy cao nhất
         best_face = None
@@ -175,15 +182,13 @@ def detect_and_crop_face(base64_data):
             if boxes is not None and len(boxes) > 0:
                 for box in boxes:
                     conf = box.conf.item()
-                    cls = box.cls.item()
-                    
-                    # Lọc khuôn mặt (class 0 trong model face)
+                    # Lấy tất cả các vật thể được detect (có thể là khuôn mặt, người, etc.)
                     if conf > 0.5 and conf > best_conf:
                         best_conf = conf
                         best_face = box.xyxy[0].cpu().numpy()
         
         if best_face is not None:
-            print(f"Tìm thấy khuôn mặt với độ tin cậy: {best_conf:.2f}")
+            logger.info(f"Tìm thấy khuôn mặt với độ tin cậy: {best_conf:.2f}")
             
             # Cắt khuôn mặt
             x1, y1, x2, y2 = map(int, best_face)
@@ -198,17 +203,20 @@ def detect_and_crop_face(base64_data):
             
             face_crop = img[y1:y2, x1:x2]
             
+            if face_crop.size == 0:
+                return None
+                
             # Chuyển về base64
             success, encoded_image = cv2.imencode('.jpg', face_crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
             if success:
                 face_base64 = base64.b64encode(encoded_image).decode('utf-8')
                 return f"data:image/jpeg;base64,{face_base64}"
         
-        print("Không tìm thấy khuôn mặt trong ảnh")
+        logger.info("Không tìm thấy khuôn mặt trong ảnh")
         return None
         
     except Exception as e:
-        print(f"Lỗi trong detect_and_crop_face: {e}")
+        logger.error(f"Lỗi trong detect_and_crop_face: {e}")
         return None
 
 @app.route('/checkDuplicate', methods=['POST'])
@@ -222,7 +230,7 @@ def check_duplicate():
         return jsonify({'duplicate': is_duplicate})
     
     except Exception as e:
-        print(f"Lỗi kiểm tra trùng: {str(e)}")
+        logger.error(f"Lỗi kiểm tra trùng: {str(e)}")
         return jsonify({'duplicate': False})
 
 @app.route('/testConnection', methods=['GET'])
@@ -235,13 +243,14 @@ def test_connection():
         conn.close()
         
         # Kiểm tra model YOLO
-        model_status = "loaded" if face_model else "failed"
+        model_status = "loaded" if face_model else "not_loaded"
         
         return jsonify({
             'status': 'ok',
             'sheetExists': True,
             'folderExists': True,
             'modelStatus': model_status,
+            'aiEnabled': face_model is not None,
             'sheetName': 'DATA',
             'sheetId': 'sqlite_database'
         })
@@ -267,7 +276,7 @@ def check_duplicate_cccd(cccd_number):
         return count > 0
     
     except Exception as e:
-        print(f"Lỗi kiểm tra trùng CCCD: {str(e)}")
+        logger.error(f"Lỗi kiểm tra trùng CCCD: {str(e)}")
         return False
 
 def save_image(base64_data, filename):
@@ -288,7 +297,7 @@ def save_image(base64_data, filename):
         return safe_filename
     
     except Exception as e:
-        print(f"Lỗi lưu ảnh: {str(e)}")
+        logger.error(f"Lỗi lưu ảnh: {str(e)}")
         return None
 
 @app.route('/uploads/<filename>')
@@ -297,7 +306,11 @@ def uploaded_file(filename):
 
 @app.route('/health')
 def health_check():
-    return jsonify({'status': 'healthy'})
+    return jsonify({
+        'status': 'healthy', 
+        'ai_enabled': face_model is not None,
+        'database': 'connected'
+    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

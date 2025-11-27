@@ -1,18 +1,7 @@
-# Web Framework
 Flask==2.3.3
 Werkzeug==2.3.7
 gunicorn==21.2.0
-
-# AI/ML - Computer Vision
-ultralytics==8.0.186
-opencv-python==4.8.1.78
 numpy==1.24.3
 Pillow==10.0.1
-torch==2.0.1
-torchvision==0.15.2
-
-# Database & Utilities
-sqlite3
-
-# Image Processing
-scikit-image==0.21.0
+opencv-python-headless==4.8.1.78
+ultralytics==8.0.200
