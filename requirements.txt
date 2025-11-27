@@ -1,7 +1,7 @@
 
 # Web
 
-Flask==2.2.5 # stable version available on PyPI
+Flask==2.2.5
 gunicorn==21.2.0
 
 # PDF processing (PyMuPDF removed, alternative pdfplumber)
