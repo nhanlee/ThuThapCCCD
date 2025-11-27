@@ -1,7 +1,19 @@
-Flask==2.3.3
-Werkzeug==2.3.7
+# Core
+Flask==3.0.2
 gunicorn==21.2.0
-numpy==1.24.3
-Pillow==10.0.1
-opencv-python-headless==4.8.1.78
-ultralytics==8.0.200
+numpy==2.1.2
+opencv-python-headless==4.10.0.84
+Pillow==10.3.0
+
+# Torch CPU nightly (Python 3.13 compatible)
+--index-url https://download.pytorch.org/whl/nightly/cpu
+torch
+torchvision
+torchaudio
+
+# YOLOv8
+ultralytics==8.3.25
+
+# Utils
+requests
+tqdm
