@@ -1,24 +1,23 @@
-FROM python:3.13-slim
+# ===========================
+#   Python 3.10 + Torch CPU
+#   Railway-compatible image
+# ===========================
 
-ENV DEBIAN_FRONTEND=noninteractive
+FROM python:3.10-slim
 
-# Install system packages
+# Clean & system deps
 RUN apt-get update && apt-get install -y \
-    git \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 libsm6 libxext6 libxrender1 libgl1 \
+    && apt-get clean
 
 WORKDIR /app
+COPY . /app
 
-COPY requirements.txt .
+# Install pip + torch CPU + ultralytics
 RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+RUN pip install -r requirements.txt
 
-COPY . .
-
-# Railway exposes PORT environment variable automatically
-ENV PORT=8080
 EXPOSE 8080
 
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app"]
+CMD ["python", "app.py"]

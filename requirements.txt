@@ -1,19 +1,11 @@
-# Core
-Flask==3.0.2
+Flask==2.2.5
+flask-cors==4.0.1
 gunicorn==21.2.0
-numpy==2.1.2
-opencv-python-headless==4.10.0.84
+
+opencv-python-headless==4.9.0.80
 Pillow==10.3.0
 
-# Torch CPU nightly (Python 3.13 compatible)
---index-url https://download.pytorch.org/whl/nightly/cpu
-torch
-torchvision
-torchaudio
+numpy==1.26.4
+pandas==2.1.4
 
-# YOLOv8
 ultralytics==8.3.25
-
-# Utils
-requests
-tqdm
