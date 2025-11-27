@@ -136,8 +136,6 @@ pydot==4.0.1
 Pygments==2.19.2
 pyinstaller==6.15.0
 pyinstaller-hooks-contrib==2025.8
-PyMuPDF==1.23.6
-PyMuPDFb==1.23.6
 pyparsing==3.2.3
 pypdf==6.4.0
 pypdfium2==4.30.0
