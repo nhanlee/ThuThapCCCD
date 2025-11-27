@@ -11,6 +11,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     
     <style>
+        /* Giữ nguyên toàn bộ CSS như trước */
         :root {
             --primary: #0d6efd;
             --secondary: #6c757d;
@@ -183,7 +184,7 @@
         }
         
         .face-frame::after {
-            content: 'Khuôn mặt';
+            content: 'Khuôn mặt (Tự động nhận diện)';
             position: absolute;
             bottom: -25px;
             color: #00ff00;
@@ -469,6 +470,10 @@
         .success-message {
             margin: 15px;
         }
+        
+        .ai-status {
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -481,7 +486,7 @@
                         <i class="bi bi-person-badge me-2"></i>
                         QUÉT CCCD
                     </h1>
-                    <div class="header-subtitle">Quét mã QR và chụp ảnh CCCD tự động</div>
+                    <div class="header-subtitle">Quét mã QR và chụp ảnh CCCD tự động - AI nhận diện khuôn mặt</div>
                 </div>
                 <div class="badge bg-light text-primary" id="connectionStatus">
                     <i class="bi bi-circle-fill me-1"></i>
@@ -577,7 +582,7 @@
             <div class="screen" id="frontScreen">
                 <div class="alert alert-warning d-flex align-items-center m-2 mb-0">
                     <i class="bi bi-camera me-2"></i>
-                    <span class="small">Đưa mặt trước CCCD vào khung. Đảm bảo khuôn mặt nằm trong khung xanh (góc dưới bên trái).</span>
+                    <span class="small">Đưa mặt trước CCCD vào khung. Hệ thống sẽ tự động nhận diện khuôn mặt bằng AI.</span>
                 </div>
 
                 <div class="flex-grow-1 d-flex flex-column m-2">
@@ -588,7 +593,7 @@
                                 <div class="overlay id-overlay">
                                     <div class="id-frame">
                                         <div class="face-frame"></div>
-                                        <div class="id-guide">Mặt trước CCCD - Căn khuôn mặt vào ô xanh (trái/dưới)</div>
+                                        <div class="id-guide">Mặt trước CCCD - AI tự động nhận diện khuôn mặt</div>
                                     </div>
                                 </div>
                             </div>
@@ -717,7 +722,6 @@
         let qrData = null;
         let frontImg = null;
         let backImg = null;
-        let faceImg = null;
         let scanInterval = null;
         let currentStream = null;
         let scanAttempts = 0;
@@ -749,67 +753,7 @@
         }
 
         //---------------------------------------
-        // PHƯƠNG PHÁP CẮT KHUÔN MẶT - BÊN TRÁI GÓC DƯỚI
-        //---------------------------------------
-        function cropFaceFromImage(imageBase64) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.src = imageBase64;
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Kích thước ảnh gốc (đã được crop từ khung chụp)
-                    const imgWidth = img.width;
-                    const imgHeight = img.height;
-                    
-                    console.log("Kích thước ảnh gốc:", imgWidth, "x", imgHeight);
-                    
-                    // VỊ TRÍ MỚI: BÊN TRÁI GÓC DƯỚI
-                    const faceX = imgWidth * 0.10;    // 10% từ trái sang
-                    const faceY = imgHeight * 0.60;   // 60% từ trên xuống (góc dưới)
-                    const faceWidth = imgWidth * 0.25;  // 25% chiều rộng
-                    const faceHeight = imgHeight * 0.30; // 30% chiều cao
-                    
-                    // Đảm bảo không vượt quá kích thước ảnh
-                    const finalX = Math.max(0, faceX);
-                    const finalY = Math.max(0, faceY);
-                    const finalWidth = Math.min(faceWidth, imgWidth - finalX);
-                    const finalHeight = Math.min(faceHeight, imgHeight - finalY);
-                    
-                    console.log("Vị trí cắt khuôn mặt (trái/dưới):", {
-                        x: finalX, 
-                        y: finalY, 
-                        width: finalWidth, 
-                        height: finalHeight
-                    });
-                    
-                    // Đặt kích thước canvas bằng kích thước khuôn mặt
-                    canvas.width = finalWidth;
-                    canvas.height = finalHeight;
-                    
-                    // Cắt phần khuôn mặt
-                    ctx.drawImage(
-                        img,
-                        finalX, finalY, finalWidth, finalHeight,
-                        0, 0, finalWidth, finalHeight
-                    );
-                    
-                    const faceBase64 = canvas.toDataURL('image/jpeg', 0.9);
-                    console.log("Đã cắt khuôn mặt thành công (vị trí trái/dưới)");
-                    resolve(faceBase64);
-                };
-                
-                img.onerror = function() {
-                    // Nếu có lỗi, trả về ảnh gốc
-                    console.error("Lỗi tải ảnh");
-                    resolve(imageBase64);
-                };
-            });
-        }
-
-        //---------------------------------------
-        // LUỒNG XỬ LÝ CHÍNH
+        // LUỒNG XỬ LÝ CHÍNH - ĐÃ BỎ CẮT KHUÔN MẶT THỦ CÔNG
         //---------------------------------------
         async function handleQRScanSuccess(code) {
             clearInterval(scanInterval);
@@ -1059,16 +1003,7 @@
             
             if (type === 'front') {
                 frontImg = img64;
-                
-                // CẮT KHUÔN MẶT TỰ ĐỘNG TỪ ẢNH MẶT TRƯỚC (VỊ TRÍ TRÁI/DƯỚI)
-                try {
-                    faceImg = await cropFaceFromImage(img64);
-                    showToast("Đã chụp mặt trước và cắt khuôn mặt thành công!", "success");
-                } catch (error) {
-                    console.error("Lỗi khi cắt khuôn mặt:", error);
-                    faceImg = img64;
-                    showToast("Đã chụp mặt trước thành công!", "success");
-                }
+                showToast("Đã chụp mặt trước thành công! AI sẽ tự động nhận diện khuôn mặt.", "success");
                 
                 setTimeout(() => {
                     showScreen('backScreen');
@@ -1228,11 +1163,14 @@
                 <div class="col-12 col-md-4 mb-2">
                     <div class="card">
                         <div class="card-header text-center py-1">
-                            <i class="bi bi-person me-2"></i>
-                            Ảnh khuôn mặt
+                            <i class="bi bi-robot me-2"></i>
+                            Ảnh khuôn mặt (AI nhận diện)
                         </div>
                         <div class="card-body p-1">
-                            <img src="${faceImg}" class="preview-image">
+                            <div class="text-center p-3">
+                                <i class="bi bi-cpu fs-1 text-muted"></i>
+                                <p class="small text-muted mt-2">Khuôn mặt sẽ được tự động nhận diện và cắt bằng AI khi lưu</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1287,13 +1225,13 @@
                 diachi: qrData.diachi,
                 ngaycap: qrData.ngaycap,
                 front: extractBase64Data(frontImg),
-                back: extractBase64Data(backImg),
-                face: extractBase64Data(faceImg)
+                back: extractBase64Data(backImg)
+                // KHÔNG gửi ảnh khuôn mặt - server sẽ tự động nhận diện
             };
 
             const saveBtn = document.getElementById("saveButton");
             const originalText = saveBtn.innerHTML;
-            saveBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang lưu...';
+            saveBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang lưu và nhận diện khuôn mặt...';
             saveBtn.disabled = true;
 
             fetch('/saveCCCD', {
@@ -1306,7 +1244,11 @@
             .then(response => response.json())
             .then(res => {
                 if (res.success) {
-                    showSuccessMessage();
+                    if (res.face_detected) {
+                        showSuccessMessage("Lưu thông tin thành công! Đã nhận diện khuôn mặt bằng AI.");
+                    } else {
+                        showSuccessMessage("Lưu thông tin thành công! Không tìm thấy khuôn mặt trong ảnh.");
+                    }
                 } else {
                     saveBtn.innerHTML = originalText;
                     saveBtn.disabled = false;
@@ -1324,12 +1266,12 @@
             });
         }
 
-        function showSuccessMessage() {
+        function showSuccessMessage(message = "Lưu thông tin thành công!") {
             const container = document.getElementById("successMessageContainer");
             container.innerHTML = `
                 <div class="alert alert-success text-center success-message">
                     <i class="bi bi-check-circle-fill fs-1 d-block mb-2"></i>
-                    <h5 class="alert-heading">Lưu thông tin thành công!</h5>
+                    <h5 class="alert-heading">${message}</h5>
                     <p class="mb-0">Tự động chuyển về trang chủ sau 3 giây...</p>
                 </div>
             `;
@@ -1356,7 +1298,6 @@
             qrData = null;
             frontImg = null;
             backImg = null;
-            faceImg = null;
             scanAttempts = 0;
             
             document.getElementById("imgFront").classList.remove("show");
@@ -1382,7 +1323,8 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.status === "ok") {
-                        statusElement.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i><span class="d-none d-sm-inline">Đã kết nối</span>';
+                        const modelStatus = result.modelStatus === "loaded" ? "AI Sẵn sàng" : "AI Đang tải";
+                        statusElement.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i><span class="d-none d-sm-inline">Đã kết nối - ${modelStatus}</span>`;
                         statusElement.className = 'badge bg-success';
                     } else {
                         statusElement.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i><span class="d-none d-sm-inline">Lỗi kết nối</span>';

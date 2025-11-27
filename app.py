@@ -2,18 +2,31 @@ import os
 import json
 import base64
 import sqlite3
+import cv2
+import numpy as np
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
+from ultralytics import YOLO
 import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = 'images'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Đảm bảo thư mục upload tồn tại
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Tải model YOLOv8 cho nhận diện khuôn mặt
+try:
+    print("Đang tải model YOLOv8 cho nhận diện khuôn mặt...")
+    face_model = YOLO('yolov8n-face.pt')  # Model chuyên dụng cho khuôn mặt
+    print("Đã tải model YOLOv8 thành công!")
+except Exception as e:
+    print(f"Lỗi khi tải model YOLOv8: {e}")
+    print("Sử dụng model YOLOv8n tiêu chuẩn...")
+    face_model = YOLO('yolov8n.pt')
 
 # Khởi tạo database
 def init_db():
@@ -71,10 +84,22 @@ def save_cccd():
                 'duplicateCCCD': cccd_number
             }), 400
 
-        # Lưu ảnh
+        # Lưu ảnh mặt trước và mặt sau
         front_filename = save_image(data.get('front'), cccd_number + '_front.jpg') if data.get('front') else None
         back_filename = save_image(data.get('back'), cccd_number + '_back.jpg') if data.get('back') else None
-        face_filename = save_image(data.get('face'), cccd_number + '_face.jpg') if data.get('face') else None
+        
+        # Tự động nhận diện và cắt khuôn mặt từ ảnh mặt trước
+        face_filename = None
+        if data.get('front'):
+            try:
+                face_base64 = detect_and_crop_face(data.get('front'))
+                if face_base64:
+                    face_filename = save_image(face_base64, cccd_number + '_face.jpg')
+                    print(f"Đã nhận diện và cắt khuôn mặt thành công cho CCCD: {cccd_number}")
+                else:
+                    print(f"Không tìm thấy khuôn mặt trong ảnh CCCD: {cccd_number}")
+            except Exception as e:
+                print(f"Lỗi khi nhận diện khuôn mặt: {e}")
 
         # Lưu vào database
         conn = sqlite3.connect('cccd.db')
@@ -106,7 +131,8 @@ def save_cccd():
         return jsonify({
             'success': True,
             'message': 'Lưu thành công!',
-            'cccd': cccd_number
+            'cccd': cccd_number,
+            'face_detected': face_filename is not None
         })
 
     except Exception as e:
@@ -116,6 +142,74 @@ def save_cccd():
             'error': 'server_error',
             'message': f'Lỗi server: {str(e)}'
         }), 500
+
+def detect_and_crop_face(base64_data):
+    """
+    Nhận diện và cắt khuôn mặt từ ảnh sử dụng YOLOv8
+    """
+    try:
+        # Chuyển base64 thành image
+        if base64_data.startswith('data:image'):
+            base64_data = base64_data.split(',')[1]
+        
+        image_data = base64.b64decode(base64_data)
+        nparr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            print("Không thể decode ảnh")
+            return None
+        
+        # Chuyển đổi màu từ BGR sang RGB
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # Nhận diện khuôn mặt với YOLOv8
+        results = face_model(img_rgb, verbose=False)
+        
+        # Tìm khuôn mặt có độ tin cậy cao nhất
+        best_face = None
+        best_conf = 0
+        
+        for result in results:
+            boxes = result.boxes
+            if boxes is not None and len(boxes) > 0:
+                for box in boxes:
+                    conf = box.conf.item()
+                    cls = box.cls.item()
+                    
+                    # Lọc khuôn mặt (class 0 trong model face)
+                    if conf > 0.5 and conf > best_conf:
+                        best_conf = conf
+                        best_face = box.xyxy[0].cpu().numpy()
+        
+        if best_face is not None:
+            print(f"Tìm thấy khuôn mặt với độ tin cậy: {best_conf:.2f}")
+            
+            # Cắt khuôn mặt
+            x1, y1, x2, y2 = map(int, best_face)
+            
+            # Mở rộng vùng cắt một chút
+            margin = 0.1
+            h, w = img.shape[:2]
+            x1 = max(0, int(x1 - (x2 - x1) * margin))
+            y1 = max(0, int(y1 - (y2 - y1) * margin))
+            x2 = min(w, int(x2 + (x2 - x1) * margin))
+            y2 = min(h, int(y2 + (y2 - y1) * margin))
+            
+            face_crop = img[y1:y2, x1:x2]
+            
+            # Chuyển về base64
+            success, encoded_image = cv2.imencode('.jpg', face_crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if success:
+                face_base64 = base64.b64encode(encoded_image).decode('utf-8')
+                return f"data:image/jpeg;base64,{face_base64}"
+        
+        print("Không tìm thấy khuôn mặt trong ảnh")
+        return None
+        
+    except Exception as e:
+        print(f"Lỗi trong detect_and_crop_face: {e}")
+        return None
 
 @app.route('/checkDuplicate', methods=['POST'])
 def check_duplicate():
@@ -140,10 +234,14 @@ def test_connection():
         cursor.execute('SELECT COUNT(*) FROM cccd_records')
         conn.close()
         
+        # Kiểm tra model YOLO
+        model_status = "loaded" if face_model else "failed"
+        
         return jsonify({
             'status': 'ok',
             'sheetExists': True,
             'folderExists': True,
+            'modelStatus': model_status,
             'sheetName': 'DATA',
             'sheetId': 'sqlite_database'
         })
