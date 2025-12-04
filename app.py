@@ -40,6 +40,8 @@ def init_db():
     connection = None
     try:
         connection = pymysql.connect(**MYSQL_CONFIG)
+        logger.info("Kết nối database thành công!")
+        
         with connection.cursor() as cursor:
             # Tạo bảng users
             cursor.execute("""
@@ -99,22 +101,11 @@ try:
 except Exception as e:
     logger.warning(f"Could not initialize database on startup: {e}")
 
-# Khởi tạo YOLO model
-face_model = None
-try:
-    from ultralytics import YOLO
-    logger.info("Đang tải YOLO model...")
-    face_model = YOLO('yolov8n.pt')
-    logger.info("YOLO model đã tải thành công")
-except Exception as e:
-    logger.warning(f"Không thể tải YOLO model: {e}")
-    logger.warning("Ứng dụng sẽ chạy mà không có nhận diện khuôn mặt")
-
 # Middleware kiểm tra đăng nhập
 @app.before_request
 def check_login():
     # Các route không cần đăng nhập
-    public_routes = ['login', 'static', 'health', 'get_user_info']
+    public_routes = ['login', 'static', 'health', 'get_user_info', 'testConnection']
     
     if request.endpoint in public_routes:
         return
@@ -245,23 +236,6 @@ def save_cccd():
             }), 400
         
         logger.info("Bắt đầu xử lý ảnh...")
-        
-        # Tự động nhận diện và cắt khuôn mặt từ ảnh mặt trước
-        face_base64 = None
-        face_detected = False
-        
-        if front_base64 and face_model:
-            try:
-                logger.info("Đang nhận diện khuôn mặt...")
-                face_base64 = detect_and_crop_face(front_base64)
-                if face_base64:
-                    logger.info("Đã nhận diện được khuôn mặt")
-                    face_detected = True
-                else:
-                    logger.info("Không tìm thấy khuôn mặt trong ảnh CCCD")
-            except Exception as e:
-                logger.error(f"Lỗi khi nhận diện khuôn mặt: {e}")
-                logger.error(traceback.format_exc())
 
         # Lưu vào database
         connection = None
@@ -271,8 +245,8 @@ def save_cccd():
             with connection.cursor() as cursor:
                 sql = '''
                     INSERT INTO cccd_records 
-                    (cccd_moi, cmnd_cu, name, dob, gender, address, issue_date, phone, user, front_image, back_image, face_cropped)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (cccd_moi, cmnd_cu, name, dob, gender, address, issue_date, phone, user, front_image, back_image)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 '''
                 
                 # Chuyển đổi ngày tháng
@@ -301,8 +275,7 @@ def save_cccd():
                     data.get('phone', ''),
                     session.get('username'),
                     front_base64,  # Lưu base64 trực tiếp
-                    back_base64,   # Lưu base64 trực tiếp
-                    face_base64    # Lưu base64 trực tiếp
+                    back_base64    # Lưu base64 trực tiếp
                 ))
             connection.commit()
             logger.info(f"Đã lưu CCCD {cccd_number} vào database")
@@ -318,9 +291,7 @@ def save_cccd():
         return jsonify({
             'success': True,
             'message': 'Lưu thành công!',
-            'cccd': cccd_number,
-            'face_detected': face_detected,
-            'ai_enabled': face_model is not None
+            'cccd': cccd_number
         })
 
     except pymysql.err.IntegrityError as e:
@@ -354,80 +325,6 @@ def save_cccd():
             'error': 'server_error',
             'message': f'Lỗi server: {str(e)}'
         }), 500
-
-def detect_and_crop_face(base64_data):
-    """Nhận diện và cắt khuôn mặt từ ảnh sử dụng YOLOv8"""
-    if not face_model:
-        return None
-        
-    try:
-        import cv2
-        import numpy as np
-        
-        # Chuyển base64 thành image
-        if base64_data.startswith('data:image'):
-            base64_data = base64_data.split(',')[1]
-        
-        image_data = base64.b64decode(base64_data)
-        nparr = np.frombuffer(image_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
-            logger.error("Không thể decode ảnh")
-            return None
-        
-        # Nhận diện khuôn mặt với YOLOv8
-        results = face_model(img, verbose=False)
-        
-        # Tìm khuôn mặt có độ tin cậy cao nhất
-        best_face = None
-        best_conf = 0
-        
-        for result in results:
-            boxes = result.boxes
-            if boxes is not None and len(boxes) > 0:
-                for box in boxes:
-                    conf = box.conf.item()
-                    cls = int(box.cls.item())
-                    # YOLOv8n có thể detect nhiều object, chúng ta cần filter khuôn mặt
-                    # Class 0 trong COCO dataset là "person", nhưng tốt nhất dùng model face riêng
-                    # Ở đây chúng ta giả sử tất cả detection với conf > 0.5 đều có thể là face
-                    if conf > 0.5 and conf > best_conf:
-                        best_conf = conf
-                        best_face = box.xyxy[0].cpu().numpy()
-        
-        if best_face is not None:
-            logger.info(f"Tìm thấy khuôn mặt với độ tin cậy: {best_conf:.2f}")
-            
-            # Cắt khuôn mặt
-            x1, y1, x2, y2 = map(int, best_face)
-            
-            # Mở rộng vùng cắt một chút
-            margin = 0.1
-            h, w = img.shape[:2]
-            x1 = max(0, int(x1 - (x2 - x1) * margin))
-            y1 = max(0, int(y1 - (y2 - y1) * margin))
-            x2 = min(w, int(x2 + (x2 - x1) * margin))
-            y2 = min(h, int(y2 + (y2 - y1) * margin))
-            
-            face_crop = img[y1:y2, x1:x2]
-            
-            if face_crop.size == 0:
-                return None
-                
-            # Chuyển về base64
-            success, encoded_image = cv2.imencode('.jpg', face_crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
-            if success:
-                face_base64 = base64.b64encode(encoded_image).decode('utf-8')
-                return f"data:image/jpeg;base64,{face_base64}"
-        
-        logger.info("Không tìm thấy khuôn mặt trong ảnh")
-        return None
-        
-    except Exception as e:
-        logger.error(f"Lỗi trong detect_and_crop_face: {e}")
-        logger.error(traceback.format_exc())
-        return None
 
 @app.route('/checkDuplicate', methods=['POST'])
 def check_duplicate():
@@ -581,31 +478,29 @@ def test_connection():
     try:
         # Kiểm tra kết nối database
         connection = None
-        db_status = "not_connected"
+        db_status = "connected"
         try:
             connection = pymysql.connect(**MYSQL_CONFIG)
             with connection.cursor() as cursor:
-                cursor.execute('SELECT COUNT(*) as count FROM cccd_records')
+                cursor.execute('SELECT 1')
                 result = cursor.fetchone()
             db_status = "connected"
+            logger.info("Kiểm tra kết nối database: THÀNH CÔNG")
         except Exception as db_error:
             db_status = f"error: {str(db_error)}"
+            logger.error(f"Kiểm tra kết nối database: THẤT BẠI - {str(db_error)}")
         finally:
             if connection:
                 connection.close()
         
-        # Kiểm tra model YOLO
-        model_status = "loaded" if face_model else "not_loaded"
-        
         return jsonify({
             'status': 'ok',
-            'modelStatus': model_status,
-            'aiEnabled': face_model is not None,
-            'databaseStatus': db_status
+            'databaseStatus': db_status,
+            'message': 'Kết nối thành công'
         })
     
     except Exception as e:
-        logger.error(f"Lỗi kết nối: {str(e)}")
+        logger.error(f"Lỗi testConnection: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -623,12 +518,11 @@ def health_check():
     
     return jsonify({
         'status': 'healthy', 
-        'ai_enabled': face_model is not None,
         'database': db_status
     })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     logger.info(f"Ứng dụng khởi động trên cổng {port}")
-    logger.info(f"YOLO model: {'Đã tải' if face_model else 'Chưa tải'}")
+    logger.info(f"Database config: host={DB_HOST}, port={DB_PORT}, user={DB_USER}, database={DB_NAME}")
     app.run(host='0.0.0.0', port=port, debug=False)
