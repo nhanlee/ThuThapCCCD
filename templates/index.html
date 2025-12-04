@@ -6,8 +6,8 @@
     <title>Hệ Thống Quét CCCD</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Load OpenCV.js -->
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <!-- Load jsQR for QR code scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <style>
         .camera-container {
             position: relative;
@@ -289,8 +289,8 @@
                             <span id="dbStatus">Đang kiểm tra kết nối database...</span>
                         </div>
                         <div class="flex items-center text-sm text-gray-600 mt-2">
-                            <i class="fas fa-camera mr-2"></i>
-                            <span id="cvStatus">Đang tải OpenCV...</span>
+                            <i class="fas fa-qrcode mr-2"></i>
+                            <span id="cvStatus">Đang tải QR Scanner...</span>
                         </div>
                     </div>
                 </div>
@@ -360,7 +360,7 @@
                             <div class="bg-blue-50 px-6 py-4">
                                 <div class="flex items-center text-sm text-blue-700">
                                     <i class="fas fa-camera mr-2"></i>
-                                    <span>Camera phóng to 3x + OpenCV QR Detection</span>
+                                    <span>Camera phóng to 3x + jsQR Detection</span>
                                 </div>
                             </div>
                         </div>
@@ -501,7 +501,7 @@
                                     <i class="fas fa-qrcode text-blue-500 mr-2"></i>
                                     Bước 1: Quét Mã QR CCCD
                                 </h3>
-                                <p class="text-gray-600 mt-1">Đưa mã QR vào khung hình. Hệ thống tự động quét bằng OpenCV</p>
+                                <p class="text-gray-600 mt-1">Đưa mã QR vào khung hình. Hệ thống tự động quét bằng jsQR</p>
                                 <div class="mt-2 text-sm text-blue-600">
                                     <i class="fas fa-info-circle mr-1"></i>
                                     Camera đang được phóng to 3x để quét chính xác hơn
@@ -542,7 +542,7 @@
                                     <div class="bg-gray-50 rounded-lg p-4 text-center">
                                         <p class="text-sm text-gray-600">
                                             <i class="fas fa-bolt mr-1"></i>
-                                            OpenCV
+                                            Scanner
                                         </p>
                                         <p id="cvStatusIndicator" class="font-semibold text-gray-900">Đang tải...</p>
                                     </div>
@@ -555,7 +555,7 @@
                                             <div>
                                                 <p class="font-medium text-blue-800">Hướng dẫn quét QR</p>
                                                 <p class="text-sm text-blue-600 mt-1">
-                                                    Đưa mã QR CCCD vào khung hình màu xanh. Hệ thống sẽ tự động nhận diện bằng OpenCV.
+                                                    Đưa mã QR CCCD vào khung hình màu xanh. Hệ thống sẽ tự động nhận diện bằng jsQR.
                                                     Giữ yên camera để quét chính xác.
                                                 </p>
                                             </div>
@@ -949,36 +949,25 @@
         let currentSearch = '';
         let totalRecords = 0;
         let totalPages = 1;
-        let cvReady = false;
-        let qrDetector = null;
+        let scannerReady = false;
 
         // Khởi tạo ứng dụng
         document.addEventListener('DOMContentLoaded', function() {
             checkAuthStatus();
             testConnection();
+            initQRScanner();
         });
 
-        // Hàm callback khi OpenCV đã tải xong
-        function onOpenCvReady() {
-            console.log("✅ OpenCV.js đã tải thành công");
-            cvReady = true;
+        // Khởi tạo QR scanner
+        function initQRScanner() {
+            console.log("✅ QR Scanner đã sẵn sàng (sử dụng jsQR)");
+            scannerReady = true;
             
-            try {
-                // Tạo QR code detector
-                qrDetector = new cv.QRCodeDetector();
-                console.log("✅ OpenCV QRCodeDetector đã sẵn sàng");
-                
-                document.getElementById('cvStatus').textContent = 'OpenCV: Đã sẵn sàng';
-                document.getElementById('cvStatusIndicator').textContent = 'Sẵn sàng';
-                document.getElementById('systemStatus').textContent = 'Sẵn sàng';
-                
-                showToast('OpenCV đã sẵn sàng! Có thể quét QR code.', 'success');
-            } catch (error) {
-                console.error("❌ Lỗi khởi tạo QRCodeDetector:", error);
-                document.getElementById('cvStatus').textContent = 'OpenCV: Lỗi khởi tạo';
-                document.getElementById('cvStatusIndicator').textContent = 'Lỗi';
-                showToast('Lỗi khởi tạo OpenCV QR detector', 'error');
-            }
+            document.getElementById('cvStatus').textContent = 'QR Scanner: Đã sẵn sàng';
+            document.getElementById('cvStatusIndicator').textContent = 'Sẵn sàng';
+            document.getElementById('systemStatus').textContent = 'Sẵn sàng';
+            
+            showToast('QR Scanner đã sẵn sàng! Có thể quét QR code.', 'success');
         }
 
         // Kiểm tra trạng thái đăng nhập
@@ -1170,9 +1159,9 @@
                         document.getElementById('systemStatus').textContent = 'Có lỗi';
                     }
                     
-                    // Cập nhật trạng thái OpenCV
-                    if (data.opencv?.success) {
-                        document.getElementById('cvStatus').textContent = `OpenCV: ${data.opencv.message}`;
+                    // Cập nhật trạng thái Scanner
+                    if (data.scanner?.success) {
+                        document.getElementById('cvStatus').textContent = `QR Scanner: ${data.scanner.message}`;
                     }
                     
                     if (!dbSuccess) {
@@ -1320,8 +1309,8 @@
             }
             
             scanInterval = setInterval(() => {
-                if (!cvReady || !qrDetector) {
-                    console.warn("⚠️ OpenCV chưa sẵn sàng, bỏ qua lần quét");
+                if (!scannerReady) {
+                    console.warn("⚠️ QR Scanner chưa sẵn sàng, bỏ qua lần quét");
                     return;
                 }
                 
@@ -1334,8 +1323,8 @@
                     scanAttempts++;
                     document.getElementById("scanAttempts").textContent = scanAttempts;
                     
-                    // Sử dụng OpenCV để quét QR
-                    const result = scanQRWithOpenCV(video);
+                    // Sử dụng jsQR để quét QR
+                    const result = scanQRWithJSQR(video);
                     
                     if (result) {
                         clearInterval(timeInterval);
@@ -1348,8 +1337,8 @@
             }, 500); // Quét mỗi 500ms
         }
 
-        // Quét mã QR với OpenCV
-        function scanQRWithOpenCV(video) {
+        // Quét mã QR với jsQR
+        function scanQRWithJSQR(video) {
             try {
                 // Tạo canvas để vẽ frame từ video
                 const canvas = document.createElement('canvas');
@@ -1364,50 +1353,18 @@
                 // Lấy dữ liệu hình ảnh
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 
-                // Tạo OpenCV mat từ image data
-                const src = cv.matFromImageData(imageData);
+                // Sử dụng jsQR để giải mã QR code
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
                 
-                // Chuyển sang grayscale để xử lý nhanh hơn
-                const gray = new cv.Mat();
-                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-                
-                try {
-                    // Sử dụng QRCodeDetector để phát hiện và giải mã QR
-                    const result = new cv.Mat();
-                    const points = new cv.Mat();
-                    const qrCodeFound = qrDetector.detectAndDecode(gray, result, points);
-                    
-                    if (qrCodeFound && result.data32S && result.data32S.length > 0) {
-                        // Lấy dữ liệu QR
-                        const qrText = result.data32S[0];
-                        console.log("✅ QR code detected:", qrText);
-                        
-                        // Giải phóng bộ nhớ
-                        src.delete();
-                        gray.delete();
-                        result.delete();
-                        points.delete();
-                        canvas.remove();
-                        
-                        return { data: qrText };
-                    }
-                    
-                    // Giải phóng bộ nhớ
-                    src.delete();
-                    gray.delete();
-                    result.delete();
-                    points.delete();
-                    
-                } catch (detectorError) {
-                    console.warn("⚠️ Lỗi detector:", detectorError);
-                    // Thử phương pháp khác nếu cần
+                if (code) {
+                    console.log("✅ QR code detected:", code.data);
+                    return { data: code.data };
                 }
                 
-                canvas.remove();
                 return null;
                 
             } catch (error) {
-                console.error("❌ Lỗi trong scanQRWithOpenCV:", error);
+                console.error("❌ Lỗi khi quét QR:", error);
                 return null;
             }
         }

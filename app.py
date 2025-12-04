@@ -9,8 +9,6 @@ from werkzeug.utils import secure_filename
 import pymysql
 import pymysql.cursors
 import traceback
-import cv2
-import numpy as np
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
@@ -20,7 +18,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Database configuration - ĐÃ SỬA LẠI THÔNG TIN KẾT NỐI
+# Database configuration
 DB_HOST = "yamanote.proxy.rlwy.net"
 DB_PORT = 22131
 DB_USER = "root"
@@ -84,9 +82,7 @@ def init_db():
                 try:
                     cursor.execute("""
                         INSERT INTO users (username, fullname, role) VALUES 
-                        ('admin', 'Quản trị viên', 'admin'),
-                        ('user1', 'Người dùng 1', 'user'),
-                        ('user2', 'Người dùng 2', 'user')
+                        ('admin', 'Quản trị viên', 'admin')
                     """)
                     logger.info("✅ Đã thêm users mẫu")
                 except Exception as insert_error:
@@ -512,21 +508,8 @@ def test_connection():
         # Kiểm tra kết nối database
         db_success, db_message = check_db_connection()
         
-        # Kiểm tra OpenCV
-        cv2_success = True
-        cv2_message = "✅ OpenCV đã sẵn sàng"
-        
-        # Kiểm tra QR code detector
-        try:
-            detector = cv2.QRCodeDetector()
-            cv2_success = True
-            cv2_message = "✅ OpenCV QR Code Detector đã sẵn sàng"
-        except Exception as cv_error:
-            cv2_success = False
-            cv2_message = f"⚠️ OpenCV QR Code Detector: {str(cv_error)}"
-        
         # Trạng thái tổng thể
-        if db_success and cv2_success:
+        if db_success:
             status = 'ok'
             message = 'Tất cả hệ thống hoạt động bình thường'
         else:
@@ -543,10 +526,10 @@ def test_connection():
                 'port': DB_PORT,
                 'database': DB_NAME
             },
-            'opencv': {
-                'success': cv2_success,
-                'message': cv2_message,
-                'version': cv2.__version__
+            'scanner': {
+                'success': True,
+                'message': '✅ QR Scanner sẵn sàng',
+                'technology': 'jsQR'
             }
         })
     
@@ -587,5 +570,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     logger.info(f"🚀 Ứng dụng khởi động trên cổng {port}")
     logger.info(f"📊 Database: {DB_HOST}:{DB_PORT}/{DB_NAME}")
-    logger.info(f"🖥️ OpenCV version: {cv2.__version__}")
     app.run(host='0.0.0.0', port=port, debug=False)
