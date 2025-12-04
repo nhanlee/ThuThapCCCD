@@ -78,7 +78,7 @@ def init_db():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
             
-            # Kiểm tra và thêm user mẫu
+            # Kiểm tra và thêm user mẫu (bỏ chú thích)
             cursor.execute("SELECT COUNT(*) as count FROM users")
             result = cursor.fetchone()
             if result and result['count'] == 0:
@@ -98,7 +98,7 @@ def init_db():
             logger.info(f"Số lượng records trong database: {result['count'] if result else 0}")
             
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"❌ Error initializing database: {e}")
         logger.error(traceback.format_exc())
         raise e
     finally:
@@ -110,7 +110,7 @@ try:
     init_db()
     logger.info("Database initialization completed successfully")
 except Exception as e:
-    logger.error(f"Could not initialize database on startup: {e}")
+    logger.error(f"❌ Could not initialize database on startup: {e}")
 
 # Hàm kiểm tra kết nối database
 def check_db_connection():
@@ -124,7 +124,7 @@ def check_db_connection():
         connection.close()
         return True, "Kết nối database thành công!"
     except Exception as e:
-        error_msg = f"Lỗi kết nối database: {str(e)}"
+        error_msg = f"❌ Lỗi kết nối database: {str(e)}"
         logger.error(error_msg)
         return False, error_msg
 
@@ -187,7 +187,7 @@ def login():
                 return jsonify({'success': False, 'message': 'Tên đăng nhập không tồn tại'})
                 
     except Exception as e:
-        logger.error(f"Lỗi đăng nhập: {str(e)}")
+        logger.error(f"❌ Lỗi đăng nhập: {str(e)}")
         return jsonify({'success': False, 'message': f'Lỗi hệ thống: {str(e)}'})
     finally:
         if connection:
@@ -221,7 +221,7 @@ def save_id():
         logger.info(f"📥 Nhận request saveID từ user: {session.get('username')}")
         
         if not data or 'cccd_moi' not in data:
-            logger.error("Thiếu số CCCD trong request")
+            logger.error("❌ Thiếu số CCCD trong request")
             return jsonify({
                 'success': False,
                 'error': 'missing_cccd',
@@ -231,7 +231,7 @@ def save_id():
         cccd_number = str(data['cccd_moi']).strip()
         
         if not cccd_number:
-            logger.error("Số CCCD rỗng")
+            logger.error("❌ Số CCCD rỗng")
             return jsonify({
                 'success': False,
                 'error': 'empty_cccd',
@@ -243,7 +243,7 @@ def save_id():
         # Kiểm tra trùng CCCD
         is_duplicate = check_duplicate_cccd(cccd_number)
         if is_duplicate:
-            logger.warning(f"CCCD {cccd_number} đã tồn tại")
+            logger.warning(f"⚠️ CCCD {cccd_number} đã tồn tại")
             return jsonify({
                 'success': False,
                 'error': 'duplicate',
@@ -259,7 +259,7 @@ def save_id():
         signature_base64 = data.get('signature')
         
         if not front_base64 or not back_base64 or not signature_base64:
-            logger.error("Thiếu ảnh")
+            logger.error("❌ Thiếu ảnh")
             return jsonify({
                 'success': False,
                 'error': 'missing_images',
@@ -312,7 +312,7 @@ def save_id():
             connection.commit()
             logger.info(f"Đã lưu CCCD {cccd_number} vào database")
         except Exception as db_error:
-            logger.error(f"Lỗi khi lưu vào database: {db_error}")
+            logger.error(f"❌ Lỗi khi lưu vào database: {db_error}")
             raise
         finally:
             if connection:
@@ -328,7 +328,7 @@ def save_id():
 
     except pymysql.err.IntegrityError as e:
         if 'Duplicate entry' in str(e):
-            logger.warning(f"CCCD {cccd_number} đã tồn tại")
+            logger.warning(f"⚠️ CCCD {cccd_number} đã tồn tại (lỗi integrity)")
             return jsonify({
                 'success': False,
                 'error': 'duplicate',
@@ -336,21 +336,21 @@ def save_id():
                 'duplicateCCCD': cccd_number
             }), 400
         else:
-            logger.error(f"Database integrity error: {str(e)}")
+            logger.error(f"❌ Database integrity error: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': 'database_error',
                 'message': f'Lỗi cơ sở dữ liệu: {str(e)}'
             }), 500
     except pymysql.err.OperationalError as e:
-        logger.error(f"Database connection error: {str(e)}")
+        logger.error(f"❌ Database connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
             'message': 'Không thể kết nối đến cơ sở dữ liệu. Vui lòng thử lại sau.'
         }), 500
     except Exception as e:
-        logger.error(f"Lỗi server khi saveID: {str(e)}")
+        logger.error(f"❌ Lỗi server khi saveID: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
@@ -371,7 +371,7 @@ def check_duplicate():
         return jsonify({'duplicate': is_duplicate})
     
     except Exception as e:
-        logger.error(f"Lỗi kiểm tra trùng: {str(e)}")
+        logger.error(f"❌ Lỗi kiểm tra trùng: {str(e)}")
         return jsonify({'duplicate': False})
 
 @app.route('/get_records', methods=['GET'])
@@ -436,14 +436,14 @@ def get_records():
                 })
                 
         except Exception as e:
-            logger.error(f"Lỗi khi lấy records: {str(e)}")
+            logger.error(f"❌ Lỗi khi lấy records: {str(e)}")
             return jsonify({'success': False, 'message': str(e)})
         finally:
             if connection:
                 connection.close()
                 
     except Exception as e:
-        logger.error(f"Lỗi get_records: {str(e)}")
+        logger.error(f"❌ Lỗi get_records: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/get_record_detail/<int:record_id>', methods=['GET'])
@@ -477,14 +477,14 @@ def get_record_detail(record_id):
                 })
                 
         except Exception as e:
-            logger.error(f"Lỗi khi lấy chi tiết record: {str(e)}")
+            logger.error(f"❌ Lỗi khi lấy chi tiết record: {str(e)}")
             return jsonify({'success': False, 'message': str(e)})
         finally:
             if connection:
                 connection.close()
                 
     except Exception as e:
-        logger.error(f"Lỗi get_record_detail: {str(e)}")
+        logger.error(f"❌ Lỗi get_record_detail: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/get_all_images', methods=['GET'])
@@ -527,14 +527,14 @@ def get_all_images():
                 })
                 
         except Exception as e:
-            logger.error(f"Lỗi khi lấy ảnh: {str(e)}")
+            logger.error(f"❌ Lỗi khi lấy ảnh: {str(e)}")
             return jsonify({'success': False, 'message': str(e)})
         finally:
             if connection:
                 connection.close()
                 
     except Exception as e:
-        logger.error(f"Lỗi get_all_images: {str(e)}")
+        logger.error(f"❌ Lỗi get_all_images: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/export_excel', methods=['GET'])
@@ -590,14 +590,14 @@ def export_excel():
                 )
                 
         except Exception as e:
-            logger.error(f"Lỗi khi xuất Excel: {str(e)}")
+            logger.error(f"❌ Lỗi khi xuất Excel: {str(e)}")
             return jsonify({'success': False, 'message': str(e)})
         finally:
             if connection:
                 connection.close()
                 
     except Exception as e:
-        logger.error(f"Lỗi export_excel: {str(e)}")
+        logger.error(f"❌ Lỗi export_excel: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 def check_duplicate_cccd(cccd_number):
@@ -612,7 +612,7 @@ def check_duplicate_cccd(cccd_number):
         return count > 0
     
     except Exception as e:
-        logger.error(f"Lỗi kiểm tra trùng CCCD: {str(e)}")
+        logger.error(f"❌ Lỗi kiểm tra trùng CCCD: {str(e)}")
         return False
     finally:
         if connection:
@@ -650,7 +650,7 @@ def test_connection():
         })
     
     except Exception as e:
-        logger.error(f"Lỗi testConnection: {str(e)}")
+        logger.error(f"❌ Lỗi testConnection: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
