@@ -6,6 +6,8 @@
     <title>Hệ Thống Quét CCCD</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Load OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
     <style>
         .camera-container {
             position: relative;
@@ -19,8 +21,9 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.3); /* Giảm độ mờ xuống 0.3 */
+            background: rgba(0, 0, 0, 0.2); /* Rất trong suốt */
             z-index: 10;
+            pointer-events: none;
         }
         
         .qr-frame {
@@ -32,7 +35,16 @@
             height: 300px;
             border: 3px solid #10B981;
             border-radius: 20px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3); /* Giảm độ mờ */
+            box-shadow: 
+                0 0 0 2000px rgba(0, 0, 0, 0.2), /* Giảm mạnh độ mờ */
+                inset 0 0 20px rgba(16, 185, 129, 0.5);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.2), inset 0 0 20px rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.15), inset 0 0 30px rgba(16, 185, 129, 0.8); }
+            100% { box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.2), inset 0 0 20px rgba(16, 185, 129, 0.5); }
         }
         
         .qr-frame-corner {
@@ -70,36 +82,16 @@
             border-right-color: #10B981;
         }
         
-        .id-frame {
+        .scanning-line {
             position: absolute;
             top: 10%;
             left: 10%;
             width: 80%;
-            height: 80%;
-            border: 3px solid #F59E0B;
-            border-radius: 10px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3); /* Giảm độ mờ */
-        }
-        
-        .face-frame {
-            position: absolute;
-            bottom: 20%;
-            left: 10%;
-            width: 25%;
-            height: 30%;
-            border: 2px dashed #10B981;
-            border-radius: 5px;
-        }
-        
-        .scanning-line {
-            position: absolute;
-            top: 50%;
-            left: 10%;
-            width: 80%;
             height: 3px;
             background: linear-gradient(90deg, transparent, #10B981, #10B981, transparent);
-            animation: scan 1.5s ease-in-out infinite; /* Thay đổi animation */
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+            animation: scan 1.5s ease-in-out infinite;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.9);
+            z-index: 11;
         }
         
         @keyframes scan {
@@ -114,6 +106,42 @@
                 top: 90%; 
                 opacity: 0.8;
             }
+        }
+        
+        .id-frame {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 80%;
+            border: 3px solid #F59E0B;
+            border-radius: 10px;
+            box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.2);
+        }
+        
+        .face-frame {
+            position: absolute;
+            bottom: 20%;
+            left: 10%;
+            width: 25%;
+            height: 30%;
+            border: 2px dashed #10B981;
+            border-radius: 5px;
+        }
+        
+        /* Camera phóng to 3x */
+        .qr-video-zoom {
+            transform: scale(3); /* Phóng to 3x */
+            transform-origin: center center;
+            transition: transform 0.3s ease;
+        }
+        
+        /* Container để giữ kích thước và crop video phóng to */
+        .camera-zoom-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
         }
         
         .preview-image {
@@ -170,10 +198,31 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Phóng to video QR */
-        .qr-video-zoom {
-            transform: scale(1.5); /* Phóng to gấp 1.5 lần */
-            transform-origin: center;
+        /* Status indicator */
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .status-green {
+            background-color: #10B981;
+        }
+        
+        .status-red {
+            background-color: #EF4444;
+        }
+        
+        .status-yellow {
+            background-color: #F59E0B;
+        }
+        
+        /* Connection status */
+        .connection-status {
+            font-size: 0.875rem;
+            font-weight: 500;
         }
     </style>
 </head>
@@ -216,7 +265,18 @@
                         <input type="text" id="username" 
                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
                                placeholder="Nhập tên đăng nhập">
-                    </div>                 
+                    </div>
+                    
+                    <div class="mb-6">
+                        <div class="flex items-center text-sm text-gray-600 mb-2">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <span>Chỉ cần nhập tên đăng nhập (không cần mật khẩu)</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            Tên đăng nhập mẫu: admin, user1, user2
+                        </div>
+                    </div>
+                    
                     <button onclick="login()" 
                             class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
                         <i class="fas fa-sign-in-alt mr-2"></i>
@@ -227,6 +287,10 @@
                         <div class="flex items-center text-sm text-gray-600">
                             <i class="fas fa-database mr-2"></i>
                             <span id="dbStatus">Đang kiểm tra kết nối database...</span>
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600 mt-2">
+                            <i class="fas fa-camera mr-2"></i>
+                            <span id="cvStatus">Đang tải OpenCV...</span>
                         </div>
                     </div>
                 </div>
@@ -251,10 +315,10 @@
                         <div class="flex items-center space-x-4">
                             <div class="hidden sm:block">
                                 <div class="flex items-center space-x-2">
-                                    <span id="connectionStatusBadge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                                        <span id="connectionDot" class="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                                        <span id="connectionStatusText">Đang kết nối...</span>
-                                    </span>
+                                    <div id="connectionStatus" class="flex items-center space-x-1">
+                                        <span class="status-dot" id="statusDot"></span>
+                                        <span class="connection-status" id="connectionStatusText">Đang kiểm tra...</span>
+                                    </div>
                                 </div>
                             </div>
                             <button onclick="logout()" 
@@ -269,7 +333,7 @@
 
             <!-- Dashboard -->
             <div id="dashboardScreen" class="py-8">
-                <div class="max-w-7xl mx-auto px-4 sm:px:px-6 lg:px-8">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="text-center mb-12">
                         <h2 class="text-3xl font-bold text-gray-900 mb-4">Chào mừng trở lại!</h2>
                         <p class="text-lg text-gray-600">Chọn chức năng bạn muốn sử dụng</p>
@@ -295,8 +359,8 @@
                             </div>
                             <div class="bg-blue-50 px-6 py-4">
                                 <div class="flex items-center text-sm text-blue-700">
-                                    <i class="fas fa-bolt mr-2"></i>
-                                    <span>Quét mã QR tự động</span>
+                                    <i class="fas fa-camera mr-2"></i>
+                                    <span>Camera phóng to 3x + OpenCV QR Detection</span>
                                 </div>
                             </div>
                         </div>
@@ -354,11 +418,11 @@
                         <div class="bg-white rounded-lg shadow p-6">
                             <div class="flex items-center">
                                 <div class="flex-shrink-0">
-                                    <i class="fas fa-database text-purple-500 text-2xl"></i>
+                                    <i class="fas fa-bolt text-purple-500 text-2xl"></i>
                                 </div>
                                 <div class="ml-4">
-                                    <p class="text-sm font-medium text-gray-600">Database</p>
-                                    <p id="dbStatusMain" class="text-2xl font-semibold text-gray-900">Đang kiểm tra...</p>
+                                    <p class="text-sm font-medium text-gray-600">Hệ thống</p>
+                                    <p id="systemStatus" class="text-2xl font-semibold text-gray-900">Đang kiểm tra...</p>
                                 </div>
                             </div>
                         </div>
@@ -437,12 +501,18 @@
                                     <i class="fas fa-qrcode text-blue-500 mr-2"></i>
                                     Bước 1: Quét Mã QR CCCD
                                 </h3>
-                                <p class="text-gray-600 mt-1">Đưa mã QR vào khung hình để quét tự động</p>
+                                <p class="text-gray-600 mt-1">Đưa mã QR vào khung hình. Hệ thống tự động quét bằng OpenCV</p>
+                                <div class="mt-2 text-sm text-blue-600">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Camera đang được phóng to 3x để quét chính xác hơn
+                                </div>
                             </div>
                             
                             <div class="p-6">
-                                <div class="camera-container rounded-lg overflow-hidden" style="height: 500px;"> <!-- Tăng chiều cao -->
-                                    <video id="camera" autoplay playsinline class="w-full h-full object-cover qr-video-zoom"></video> <!-- Thêm class zoom -->
+                                <div class="camera-container rounded-lg overflow-hidden" style="height: 500px;">
+                                    <div class="camera-zoom-container">
+                                        <video id="camera" autoplay playsinline class="w-full h-full object-cover qr-video-zoom"></video>
+                                    </div>
                                     <div class="qr-overlay">
                                         <div class="qr-frame">
                                             <div class="qr-frame-corner"></div>
@@ -451,15 +521,10 @@
                                             <div class="qr-frame-corner"></div>
                                             <div class="scanning-line"></div>
                                         </div>
-                                        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-white z-20">
-                                            <i class="fas fa-qrcode text-4xl mb-4"></i>
-                                            <p class="font-bold text-lg">Đưa mã QR vào khung</p>
-                                            <p class="text-sm mt-2">Camera đã được phóng to 1.5x</p>
-                                        </div>
                                     </div>
                                 </div>
                                 
-                                <div class="mt-6 grid grid-cols-2 gap-4">
+                                <div class="mt-6 grid grid-cols-3 gap-4">
                                     <div class="bg-gray-50 rounded-lg p-4 text-center">
                                         <p class="text-sm text-gray-600">
                                             <i class="fas fa-clock mr-1"></i>
@@ -474,19 +539,28 @@
                                         </p>
                                         <p id="scanAttempts" class="font-semibold text-gray-900">0</p>
                                     </div>
+                                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                                        <p class="text-sm text-gray-600">
+                                            <i class="fas fa-bolt mr-1"></i>
+                                            OpenCV
+                                        </p>
+                                        <p id="cvStatusIndicator" class="font-semibold text-gray-900">Đang tải...</p>
+                                    </div>
                                 </div>
                                 
                                 <div class="mt-6">
-                                    <button onclick="forceScan()" 
-                                            class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 flex items-center justify-center">
-                                        <i class="fas fa-qrcode-scan mr-2"></i>
-                                        Quét Thủ Công
-                                    </button>
-                                    <button onclick="startAutoScan()" 
-                                            class="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition duration-200 flex items-center justify-center mt-3">
-                                        <i class="fas fa-play mr-2"></i>
-                                        Bắt Đầu Quét Tự Động
-                                    </button>
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-lightbulb text-blue-500 mr-3 text-xl"></i>
+                                            <div>
+                                                <p class="font-medium text-blue-800">Hướng dẫn quét QR</p>
+                                                <p class="text-sm text-blue-600 mt-1">
+                                                    Đưa mã QR CCCD vào khung hình màu xanh. Hệ thống sẽ tự động nhận diện bằng OpenCV.
+                                                    Giữ yên camera để quét chính xác.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -509,9 +583,6 @@
                                     <div class="qr-overlay">
                                         <div class="id-frame"></div>
                                         <div class="face-frame"></div>
-                                        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-center text-white z-20">
-                                            <p class="font-bold text-lg">Mặt trước CCCD</p>
-                                        </div>
                                     </div>
                                 </div>
                                 
@@ -550,7 +621,7 @@
                                     <i class="fas fa-camera text-blue-500 mr-2"></i>
                                     Bước 3: Chụp Mặt Sau CCCD
                                 </h3>
-                                <p class="text-gray-600 mt-1">Lật CCCD và đưa mặt sau vào khung. Đảm bảo thông tin rõ nét</p>
+                                <p class="text-gray-600 mt-1">Lật CCCD và đưa mặt sau vào khung</p>
                             </div>
                             
                             <div class="p-6">
@@ -558,10 +629,6 @@
                                     <video id="camBack" autoplay playsinline class="w-full h-full object-cover"></video>
                                     <div class="qr-overlay">
                                         <div class="id-frame"></div>
-                                        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-center text-white z-20">
-                                            <p class="font-bold text-lg">Mặt sau CCCD</p>
-                                            <p class="text-sm">Đảm bảo thông tin rõ nét</p>
-                                        </div>
                                     </div>
                                 </div>
                                 
@@ -642,7 +709,7 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="imagePreviews">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="imagePreviews">
                                         <!-- Ảnh preview sẽ được hiển thị ở đây -->
                                     </div>
                                     
@@ -866,7 +933,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
     <script>
         // Biến toàn cục
         let currentUser = null;
@@ -883,12 +949,37 @@
         let currentSearch = '';
         let totalRecords = 0;
         let totalPages = 1;
+        let cvReady = false;
+        let qrDetector = null;
 
         // Khởi tạo ứng dụng
         document.addEventListener('DOMContentLoaded', function() {
             checkAuthStatus();
             testConnection();
         });
+
+        // Hàm callback khi OpenCV đã tải xong
+        function onOpenCvReady() {
+            console.log("✅ OpenCV.js đã tải thành công");
+            cvReady = true;
+            
+            try {
+                // Tạo QR code detector
+                qrDetector = new cv.QRCodeDetector();
+                console.log("✅ OpenCV QRCodeDetector đã sẵn sàng");
+                
+                document.getElementById('cvStatus').textContent = 'OpenCV: Đã sẵn sàng';
+                document.getElementById('cvStatusIndicator').textContent = 'Sẵn sàng';
+                document.getElementById('systemStatus').textContent = 'Sẵn sàng';
+                
+                showToast('OpenCV đã sẵn sàng! Có thể quét QR code.', 'success');
+            } catch (error) {
+                console.error("❌ Lỗi khởi tạo QRCodeDetector:", error);
+                document.getElementById('cvStatus').textContent = 'OpenCV: Lỗi khởi tạo';
+                document.getElementById('cvStatusIndicator').textContent = 'Lỗi';
+                showToast('Lỗi khởi tạo OpenCV QR detector', 'error');
+            }
+        }
 
         // Kiểm tra trạng thái đăng nhập
         async function checkAuthStatus() {
@@ -905,7 +996,7 @@
                     showLoginScreen();
                 }
             } catch (error) {
-                console.error("Lỗi kiểm tra đăng nhập:", error);
+                console.error("❌ Lỗi kiểm tra đăng nhập:", error);
                 showLoginScreen();
             }
         }
@@ -940,7 +1031,7 @@
                     showToast(data.message, 'error');
                 }
             } catch (error) {
-                console.error("Lỗi đăng nhập:", error);
+                console.error("❌ Lỗi đăng nhập:", error);
                 showToast('Lỗi kết nối máy chủ', 'error');
             }
         }
@@ -978,6 +1069,18 @@
             document.getElementById('dashboardScreen').classList.remove('hidden');
             document.getElementById('scanScreen').classList.add('hidden');
             document.getElementById('recordsScreen').classList.add('hidden');
+            
+            // Dừng quét nếu đang chạy
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                isScanning = false;
+            }
+            
+            // Dừng camera
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
         }
 
         // Hiển thị màn hình quét
@@ -1048,35 +1151,51 @@
                 const response = await fetch('/testConnection');
                 const data = await response.json();
                 
-                if (data.status === 'ok') {
-                    document.getElementById('connectionStatusText').textContent = 'Đã kết nối';
-                    document.getElementById('connectionDot').style.backgroundColor = '#10B981';
-                    document.getElementById('connectionStatusBadge').className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+                console.log("Test connection response:", data);
+                
+                if (data.status === 'ok' || data.status === 'warning') {
+                    // Cập nhật trạng thái database
+                    const dbSuccess = data.database?.success;
+                    const dbMessage = data.database?.message || 'Không xác định';
                     
-                    document.getElementById('dbStatus').textContent = 'Database: Đã kết nối';
-                    document.getElementById('dbStatusMain').textContent = 'Đã kết nối';
+                    if (dbSuccess) {
+                        document.getElementById('dbStatus').textContent = 'Database: Đã kết nối';
+                        document.getElementById('statusDot').className = 'status-dot status-green';
+                        document.getElementById('connectionStatusText').textContent = 'Đã kết nối';
+                        document.getElementById('systemStatus').textContent = 'Sẵn sàng';
+                    } else {
+                        document.getElementById('dbStatus').textContent = `Database: ${dbMessage}`;
+                        document.getElementById('statusDot').className = 'status-dot status-red';
+                        document.getElementById('connectionStatusText').textContent = 'Lỗi kết nối';
+                        document.getElementById('systemStatus').textContent = 'Có lỗi';
+                    }
                     
-                    showToast('Kết nối database thành công!', 'success');
+                    // Cập nhật trạng thái OpenCV
+                    if (data.opencv?.success) {
+                        document.getElementById('cvStatus').textContent = `OpenCV: ${data.opencv.message}`;
+                    }
+                    
+                    if (!dbSuccess) {
+                        showToast('⚠️ Có vấn đề với kết nối database', 'warning');
+                    } else {
+                        showToast('✅ Tất cả hệ thống hoạt động bình thường', 'success');
+                    }
                 } else {
+                    document.getElementById('statusDot').className = 'status-dot status-red';
                     document.getElementById('connectionStatusText').textContent = 'Lỗi kết nối';
-                    document.getElementById('connectionDot').style.backgroundColor = '#EF4444';
-                    document.getElementById('connectionStatusBadge').className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+                    document.getElementById('dbStatus').textContent = 'Database: Lỗi kiểm tra';
+                    document.getElementById('systemStatus').textContent = 'Lỗi';
                     
-                    document.getElementById('dbStatus').textContent = 'Database: Lỗi kết nối';
-                    document.getElementById('dbStatusMain').textContent = 'Lỗi kết nối';
-                    
-                    showToast('Lỗi kết nối database', 'error');
+                    showToast('❌ Lỗi kiểm tra kết nối hệ thống', 'error');
                 }
             } catch (error) {
-                console.error("Lỗi kiểm tra kết nối:", error);
+                console.error("❌ Lỗi kiểm tra kết nối:", error);
+                document.getElementById('statusDot').className = 'status-dot status-red';
                 document.getElementById('connectionStatusText').textContent = 'Lỗi kết nối';
-                document.getElementById('connectionDot').style.backgroundColor = '#EF4444';
-                document.getElementById('connectionStatusBadge').className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
-                
                 document.getElementById('dbStatus').textContent = 'Database: Lỗi kết nối';
-                document.getElementById('dbStatusMain').textContent = 'Lỗi kết nối';
+                document.getElementById('systemStatus').textContent = 'Lỗi';
                 
-                showToast('Không thể kiểm tra kết nối', 'error');
+                showToast('❌ Không thể kiểm tra kết nối', 'error');
             }
         }
 
@@ -1091,7 +1210,7 @@
                     totalRecords = data.total;
                 }
             } catch (error) {
-                console.error("Lỗi tải thống kê:", error);
+                console.error("❌ Lỗi tải thống kê:", error);
             }
         }
 
@@ -1107,7 +1226,8 @@
                     video: {
                         facingMode: "environment",
                         width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        height: { ideal: 1080 },
+                        zoom: { ideal: 3 } // Yêu cầu zoom 3x
                     }
                 };
                 
@@ -1119,20 +1239,39 @@
                 const camFront = document.getElementById("camFront");
                 const camBack = document.getElementById("camBack");
                 
-                if (camera) camera.srcObject = stream;
+                if (camera) {
+                    camera.srcObject = stream;
+                    camera.classList.add("qr-video-zoom"); // Thêm class zoom
+                }
                 if (camFront) camFront.srcObject = stream;
                 if (camBack) camBack.srcObject = stream;
+                
+                // Thử áp dụng zoom thông qua constraints
+                try {
+                    const track = stream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    if (capabilities.zoom) {
+                        await track.applyConstraints({
+                            advanced: [{ zoom: 3 }]
+                        });
+                        console.log("✅ Đã áp dụng zoom 3x cho camera");
+                    }
+                } catch (zoomError) {
+                    console.warn("⚠️ Không thể áp dụng zoom:", zoomError);
+                }
                 
                 // Bắt đầu quét tự động sau khi camera sẵn sàng
                 setTimeout(() => {
                     startAutoScan();
                 }, 1000);
                 
-            } catch (err) {
-                console.error("Lỗi truy cập camera: ", err);
-                showToast("Lỗi: Không thể truy cập camera. Vui lòng cho phép quyền sử dụng camera.", "error");
+                showToast('Camera đã sẵn sàng. Bắt đầu quét QR tự động...', 'success');
                 
-                // Thử lại với constraints đơn giản hơn
+            } catch (err) {
+                console.error("❌ Lỗi truy cập camera: ", err);
+                
+                // Thử với constraints đơn giản hơn
                 try {
                     const simpleConstraints = {
                         video: {
@@ -1143,15 +1282,20 @@
                     const stream = await navigator.mediaDevices.getUserMedia(simpleConstraints);
                     currentStream = stream;
                     
-                    document.getElementById("camera").srcObject = stream;
-                    document.getElementById("camFront").srcObject = stream;
-                    document.getElementById("camBack").srcObject = stream;
+                    const camera = document.getElementById("camera");
+                    if (camera) {
+                        camera.srcObject = stream;
+                        camera.classList.add("qr-video-zoom");
+                    }
                     
                     setTimeout(() => {
                         startAutoScan();
                     }, 1000);
+                    
+                    showToast('Camera đã sẵn sàng (chế độ cơ bản)', 'success');
                 } catch (err2) {
-                    console.error("Lỗi truy cập camera lần 2: ", err2);
+                    console.error("❌ Lỗi truy cập camera lần 2: ", err2);
+                    showToast("❌ Lỗi: Không thể truy cập camera. Vui lòng cho phép quyền sử dụng camera.", "error");
                 }
             }
         }
@@ -1176,6 +1320,11 @@
             }
             
             scanInterval = setInterval(() => {
+                if (!cvReady || !qrDetector) {
+                    console.warn("⚠️ OpenCV chưa sẵn sàng, bỏ qua lần quét");
+                    return;
+                }
+                
                 const video = document.getElementById("camera");
                 if (!video || !video.videoWidth || !video.videoHeight) {
                     return;
@@ -1185,85 +1334,118 @@
                     scanAttempts++;
                     document.getElementById("scanAttempts").textContent = scanAttempts;
                     
-                    const code = scanQRCode(video);
+                    // Sử dụng OpenCV để quét QR
+                    const result = scanQRWithOpenCV(video);
                     
-                    if (code) {
+                    if (result) {
                         clearInterval(timeInterval);
                         clearInterval(scanInterval);
-                        handleQRScanSuccess(code);
+                        handleQRScanSuccess(result);
                     }
                 } catch (error) {
-                    console.error("Lỗi khi quét QR:", error);
+                    console.error("❌ Lỗi khi quét QR:", error);
                 }
-            }, 300); // Tăng tốc độ quét lên 300ms
+            }, 500); // Quét mỗi 500ms
         }
 
-        // Quét mã QR - Sửa lại để hoạt động chính xác
-        function scanQRCode(video) {
+        // Quét mã QR với OpenCV
+        function scanQRWithOpenCV(video) {
             try {
-                const canvas = document.createElement("canvas");
-                const ctx = canvas.getContext("2d");
+                // Tạo canvas để vẽ frame từ video
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
                 
-                // Sử dụng kích thước video thực tế
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
-                // Vẽ ảnh từ video lên canvas
+                // Vẽ frame hiện tại lên canvas
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Lấy dữ liệu ảnh
+                // Lấy dữ liệu hình ảnh
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 
-                // Sử dụng jsQR để quét
-                const code = jsQR(imageData.data, canvas.width, canvas.height, {
-                    inversionAttempts: "dontInvert",
-                });
+                // Tạo OpenCV mat từ image data
+                const src = cv.matFromImageData(imageData);
                 
-                return code;
+                // Chuyển sang grayscale để xử lý nhanh hơn
+                const gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                
+                try {
+                    // Sử dụng QRCodeDetector để phát hiện và giải mã QR
+                    const result = new cv.Mat();
+                    const points = new cv.Mat();
+                    const qrCodeFound = qrDetector.detectAndDecode(gray, result, points);
+                    
+                    if (qrCodeFound && result.data32S && result.data32S.length > 0) {
+                        // Lấy dữ liệu QR
+                        const qrText = result.data32S[0];
+                        console.log("✅ QR code detected:", qrText);
+                        
+                        // Giải phóng bộ nhớ
+                        src.delete();
+                        gray.delete();
+                        result.delete();
+                        points.delete();
+                        canvas.remove();
+                        
+                        return { data: qrText };
+                    }
+                    
+                    // Giải phóng bộ nhớ
+                    src.delete();
+                    gray.delete();
+                    result.delete();
+                    points.delete();
+                    
+                } catch (detectorError) {
+                    console.warn("⚠️ Lỗi detector:", detectorError);
+                    // Thử phương pháp khác nếu cần
+                }
+                
+                canvas.remove();
+                return null;
+                
             } catch (error) {
-                console.error("Lỗi trong scanQRCode:", error);
+                console.error("❌ Lỗi trong scanQRWithOpenCV:", error);
                 return null;
             }
         }
 
         // Xử lý khi quét QR thành công
-        async function handleQRScanSuccess(code) {
+        async function handleQRScanSuccess(result) {
             isScanning = false;
             
-            console.log("QR code data:", code.data); // Debug
+            console.log("✅ QR code data:", result.data);
             
             try {
-                qrData = parseQR(code.data);
+                qrData = parseQR(result.data);
+                
+                if (!qrData || !qrData.cccd_moi) {
+                    throw new Error("Không thể phân tích dữ liệu QR");
+                }
                 
                 // Kiểm tra trùng CCCD
                 const isDuplicate = await checkDuplicateCCCD(qrData.cccd_moi);
                 
                 if (isDuplicate) {
-                    showToast(`Số CCCD ${qrData.cccd_moi} đã tồn tại trong hệ thống!`, "error");
-                    startAutoScan();
+                    showToast(`⚠️ Số CCCD ${qrData.cccd_moi} đã tồn tại trong hệ thống!`, "error");
+                    setTimeout(() => {
+                        startAutoScan();
+                    }, 2000);
                     return;
                 }
                 
-                showToast("Đã quét mã QR thành công!", "success");
+                showToast("✅ Đã quét mã QR thành công!", "success");
                 showStep(2);
                 
             } catch (parseError) {
-                console.error("Lỗi phân tích QR:", parseError);
-                console.error("QR raw data:", code.data);
-                showToast("QR code không hợp lệ. Vui lòng thử lại!", "error");
-                startAutoScan();
-            }
-        }
-
-        // Quét thủ công
-        function forceScan() {
-            const video = document.getElementById("camera");
-            const code = scanQRCode(video);
-            
-            if (code) {
-                handleQRScanSuccess(code);
-            } else {
-                showToast("Không tìm thấy QR code. Thử lại!", "warning");
+                console.error("❌ Lỗi phân tích QR:", parseError);
+                console.error("❌ QR raw data:", result.data);
+                showToast("❌ QR code không hợp lệ. Vui lòng thử lại!", "error");
+                setTimeout(() => {
+                    startAutoScan();
+                }, 2000);
             }
         }
 
@@ -1281,14 +1463,14 @@
                 const data = await response.json();
                 return data.duplicate;
             } catch (error) {
-                console.error("Lỗi kiểm tra trùng CCCD:", error);
+                console.error("❌ Lỗi kiểm tra trùng CCCD:", error);
                 return false;
             }
         }
 
-        // Phân tích dữ liệu QR - Sửa lại để parse chính xác
+        // Phân tích dữ liệu QR
         function parseQR(text) {
-            console.log("Parsing QR text:", text); // Debug
+            console.log("🔍 Parsing QR text:", text);
             
             if (!text) {
                 throw new Error("QR code trống");
@@ -1299,9 +1481,8 @@
             
             // Kiểm tra định dạng cơ bản
             if (!text.includes('|')) {
-                // Thử các định dạng khác
+                // Có thể là QR code đơn giản chỉ có số CCCD
                 if (text.length >= 12) {
-                    // Có thể là QR code đơn giản chỉ có số CCCD
                     return {
                         cccd_moi: text,
                         cmnd_cu: "",
@@ -1316,11 +1497,10 @@
             }
             
             let arr = text.split("|");
-            console.log("QR data array:", arr); // Debug
+            console.log("📊 QR data array:", arr);
             
             if (arr.length < 7) {
-                console.warn("QR code không đủ thông tin, chỉ có", arr.length, "phần");
-                // Vẫn cố gắng parse với dữ liệu có sẵn
+                console.warn("⚠️ QR code không đủ thông tin, chỉ có", arr.length, "phần");
             }
 
             let gender = "Không rõ";
@@ -1413,7 +1593,7 @@
                     torchBtn.classList.remove("bg-yellow-100", "text-yellow-800");
                 }
             } catch (err) {
-                console.error("Lỗi khi bật/tắt đèn flash: ", err);
+                console.error("❌ Lỗi khi bật/tắt đèn flash: ", err);
                 showToast("Camera của bạn không hỗ trợ đèn flash", "warning");
             }
         }
@@ -1435,10 +1615,10 @@
                     focusBtn.classList.remove("bg-green-100", "text-green-800");
                 }, 500);
                 
-                showToast("Đã lấy nét tự động", "success");
+                showToast("✅ Đã lấy nét tự động", "success");
             } catch (err) {
-                console.error("Lỗi khi lấy nét: ", err);
-                showToast("Không thể lấy nét tự động", "warning");
+                console.error("❌ Lỗi khi lấy nét: ", err);
+                showToast("⚠️ Không thể lấy nét tự động", "warning");
             }
         }
 
@@ -1449,7 +1629,7 @@
             
             const video = document.getElementById(videoId);
             if (!video || !video.videoWidth || !video.videoHeight) {
-                showToast("Camera chưa sẵn sàng. Vui lòng chờ!", "warning");
+                showToast("⚠️ Camera chưa sẵn sàng. Vui lòng chờ!", "warning");
                 return;
             }
             
@@ -1469,7 +1649,7 @@
             canvas.height = frameHeight;
             
             // Đảm bảo video đã có dữ liệu
-            if (video.readyState >= 2) { // HAVE_CURRENT_DATA or more
+            if (video.readyState >= 2) {
                 ctx.drawImage(
                     video, 
                     frameX, frameY, frameWidth, frameHeight,
@@ -1484,14 +1664,14 @@
                 
                 if (type === 'front') {
                     frontImg = img64;
-                    showToast("Đã chụp mặt trước thành công!", "success");
+                    showToast("✅ Đã chụp mặt trước thành công!", "success");
                     
                     setTimeout(() => {
                         showStep(3);
                     }, 1000);
                 } else {
                     backImg = img64;
-                    showToast("Đã chụp mặt sau thành công!", "success");
+                    showToast("✅ Đã chụp mặt sau thành công!", "success");
                     
                     setTimeout(() => {
                         showStep(4);
@@ -1499,14 +1679,14 @@
                     }, 1000);
                 }
             } else {
-                showToast("Camera chưa sẵn sàng. Vui lòng thử lại!", "warning");
+                showToast("⚠️ Camera chưa sẵn sàng. Vui lòng thử lại!", "warning");
             }
         }
 
         // Hiển thị thông tin QR
         function displayQRInfo() {
             if (!qrData) {
-                showToast("Không có dữ liệu QR", "error");
+                showToast("❌ Không có dữ liệu QR", "error");
                 return;
             }
             
@@ -1514,15 +1694,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Số CCCD mới</label>
-                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.cccd_moi}</div>
+                        <div class="px-3 py-2 bg-gray-50 rounded border font-mono">${qrData.cccd_moi}</div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Số CMND cũ</label>
-                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.cmnd_cu}</div>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.cmnd_cu || 'Không có'}</div>
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
-                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.name}</div>
+                        <div class="px-3 py-2 bg-gray-50 rounded border font-medium">${qrData.name}</div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
@@ -1530,7 +1710,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
-                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.dob}</div>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.dob || 'Không xác định'}</div>
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
@@ -1538,7 +1718,7 @@
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Ngày cấp</label>
-                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.issue_date}</div>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.issue_date || 'Không xác định'}</div>
                     </div>
                 </div>
             `;
@@ -1550,7 +1730,7 @@
                             <i class="fas fa-camera mr-2"></i>
                             Mặt trước CCCD
                         </h5>
-                        <img src="${frontImg}" class="w-full h-48 object-cover rounded-lg">
+                        <img src="${frontImg}" class="w-full h-48 object-cover rounded-lg border border-gray-200">
                     </div>
                 </div>
                 <div class="col-span-1">
@@ -1559,7 +1739,7 @@
                             <i class="fas fa-camera mr-2"></i>
                             Mặt sau CCCD
                         </h5>
-                        <img src="${backImg}" class="w-full h-48 object-cover rounded-lg">
+                        <img src="${backImg}" class="w-full h-48 object-cover rounded-lg border border-gray-200">
                     </div>
                 </div>
             `;
@@ -1574,13 +1754,13 @@
         // Lưu dữ liệu
         async function saveData() {
             if (!qrData || !frontImg || !backImg) {
-                showToast("Vui lòng hoàn tất các bước trước khi lưu!", "warning");
+                showToast("⚠️ Vui lòng hoàn tất các bước trước khi lưu!", "warning");
                 return;
             }
 
             const phone = document.getElementById('phoneInput').value.trim();
             if (!phone) {
-                showToast("Vui lòng nhập số điện thoại!", "warning");
+                showToast("⚠️ Vui lòng nhập số điện thoại!", "warning");
                 return;
             }
 
@@ -1620,15 +1800,15 @@
                     saveBtn.disabled = false;
                     
                     if (res.error === "duplicate") {
-                        showToast(`Số CCCD ${res.duplicateCCCD} đã tồn tại trong hệ thống!`, "error");
+                        showToast(`❌ Số CCCD ${res.duplicateCCCD} đã tồn tại trong hệ thống!`, "error");
                     } else {
-                        showToast("Lỗi: " + res.message, "error");
+                        showToast("❌ Lỗi: " + res.message, "error");
                     }
                 }
             } catch (err) {
                 saveBtn.innerHTML = originalText;
                 saveBtn.disabled = false;
-                showToast("Lỗi kết nối: " + err.toString(), "error");
+                showToast("❌ Lỗi kết nối: " + err.toString(), "error");
             }
         }
 
@@ -1641,18 +1821,22 @@
                             <i class="fas fa-check-circle text-green-500 text-3xl"></i>
                         </div>
                         <div class="ml-4">
-                            <h4 class="text-lg font-semibold text-green-800">Lưu thành công!</h4>
+                            <h4 class="text-lg font-semibold text-green-800">✅ Lưu thành công!</h4>
                             <p class="text-green-700 mt-1">
-                                Thông tin CCCD đã được lưu thành công.
+                                Thông tin CCCD đã được lưu thành công vào hệ thống.
                             </p>
                             <div class="mt-4 space-y-2">
                                 <p class="text-sm text-green-600">
                                     <i class="fas fa-id-card mr-2"></i>
-                                    Số CCCD: ${res.cccd}
+                                    Số CCCD: <span class="font-bold">${res.cccd}</span>
                                 </p>
                                 <p class="text-sm text-green-600">
                                     <i class="fas fa-user mr-2"></i>
-                                    Người thực hiện: ${currentUser?.fullname || currentUser?.username}
+                                    Người thực hiện: <span class="font-bold">${currentUser?.fullname || currentUser?.username}</span>
+                                </p>
+                                <p class="text-sm text-green-600">
+                                    <i class="fas fa-clock mr-2"></i>
+                                    Thời gian: <span class="font-bold">${new Date().toLocaleTimeString('vi-VN')}</span>
                                 </p>
                             </div>
                         </div>
@@ -1703,11 +1887,11 @@
                     updatePagination(data.total, data.page, data.total_pages);
                     updateRecordsStats(data.total);
                 } else {
-                    showToast("Lỗi tải dữ liệu: " + data.message, "error");
+                    showToast("❌ Lỗi tải dữ liệu: " + data.message, "error");
                 }
             } catch (error) {
-                console.error("Lỗi tải records:", error);
-                showToast("Lỗi kết nối khi tải dữ liệu", "error");
+                console.error("❌ Lỗi tải records:", error);
+                showToast("❌ Lỗi kết nối khi tải dữ liệu", "error");
             }
         }
 
@@ -1801,7 +1985,7 @@
         // Làm mới records
         function refreshRecords() {
             loadRecords();
-            showToast("Đã làm mới dữ liệu", "success");
+            showToast("✅ Đã làm mới dữ liệu", "success");
         }
 
         // Xem chi tiết record
@@ -1813,11 +1997,11 @@
                 if (data.success) {
                     showRecordModal(data.record);
                 } else {
-                    showToast("Không tìm thấy bản ghi", "error");
+                    showToast("❌ Không tìm thấy bản ghi", "error");
                 }
             } catch (error) {
-                console.error("Lỗi tải chi tiết record:", error);
-                showToast("Lỗi tải chi tiết", "error");
+                console.error("❌ Lỗi tải chi tiết record:", error);
+                showToast("❌ Lỗi tải chi tiết", "error");
             }
         }
 
@@ -1879,8 +2063,7 @@
                         <div class="text-center">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Mặt trước</label>
                             <div class="relative">
-                                <img src="${record.front_image}" class="w-full h-48 object-cover rounded-lg">
-                                <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition duration-200 rounded-lg"></div>
+                                <img src="${record.front_image}" class="w-full h-48 object-cover rounded-lg border border-gray-300">
                             </div>
                         </div>
                     ` : ''}
@@ -1889,8 +2072,7 @@
                         <div class="text-center">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Mặt sau</label>
                             <div class="relative">
-                                <img src="${record.back_image}" class="w-full h-48 object-cover rounded-lg">
-                                <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition duration-200 rounded-lg"></div>
+                                <img src="${record.back_image}" class="w-full h-48 object-cover rounded-lg border border-gray-300">
                             </div>
                         </div>
                     ` : ''}

@@ -9,6 +9,8 @@ from werkzeug.utils import secure_filename
 import pymysql
 import pymysql.cursors
 import traceback
+import cv2
+import numpy as np
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
@@ -18,12 +20,12 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Database configuration
-DB_HOST = os.getenv("DB_HOST", "yamanote.proxy.rlwy.net")
-DB_PORT = int(os.getenv("DB_PORT", 22131))
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASS = os.getenv("DB_PASS", "wIGaLEezXhTLlSShztFWktORKCeSaEGO")
-DB_NAME = os.getenv("DB_NAME", "railway")
+# Database configuration - ĐÃ SỬA LẠI THÔNG TIN KẾT NỐI
+DB_HOST = "yamanote.proxy.rlwy.net"
+DB_PORT = 22131
+DB_USER = "root"
+DB_PASS = "wIGaLEezXhTLlSShztFWktORKCeSaEGO"
+DB_NAME = "railway"
 
 MYSQL_CONFIG = {
     'host': DB_HOST,
@@ -32,7 +34,8 @@ MYSQL_CONFIG = {
     'password': DB_PASS,
     'database': DB_NAME,
     'charset': 'utf8mb4',
-    'cursorclass': pymysql.cursors.DictCursor
+    'cursorclass': pymysql.cursors.DictCursor,
+    'connect_timeout': 10
 }
 
 # Khởi tạo database
@@ -40,7 +43,7 @@ def init_db():
     connection = None
     try:
         connection = pymysql.connect(**MYSQL_CONFIG)
-        logger.info("Kết nối database thành công!")
+        logger.info(f"✅ Kết nối database thành công! Host: {DB_HOST}, Database: {DB_NAME}")
         
         with connection.cursor() as cursor:
             # Tạo bảng users
@@ -54,7 +57,7 @@ def init_db():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
             
-            # Tạo bảng cccd_records với cột LONGTEXT để lưu ảnh base64
+            # Tạo bảng cccd_records
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS `cccd_records` (
                     `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -74,38 +77,66 @@ def init_db():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
             
-            # Thêm user mẫu nếu chưa có
+            # Kiểm tra và thêm user mẫu
             cursor.execute("SELECT COUNT(*) as count FROM users")
             result = cursor.fetchone()
-            if result['count'] == 0:
-                cursor.execute("""
-                    INSERT INTO users (username, fullname, role) VALUES 
-                    ('admin', 'Quản trị viên', 'admin'),
-                    ('user1', 'Người dùng 1', 'user'),
-                    ('user2', 'Người dùng 2', 'user')
-                """)
-                logger.info("Đã thêm users mẫu")
+            if result and result['count'] == 0:
+                try:
+                    cursor.execute("""
+                        INSERT INTO users (username, fullname, role) VALUES 
+                        ('admin', 'Quản trị viên', 'admin'),
+                        ('user1', 'Người dùng 1', 'user'),
+                        ('user2', 'Người dùng 2', 'user')
+                    """)
+                    logger.info("✅ Đã thêm users mẫu")
+                except Exception as insert_error:
+                    logger.warning(f"Không thể thêm users mẫu: {insert_error}")
                 
         connection.commit()
-        logger.info("Database initialized successfully")
+        logger.info("✅ Database initialized successfully")
+        
+        # Đếm số lượng records
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) as count FROM cccd_records")
+            result = cursor.fetchone()
+            logger.info(f"✅ Số lượng records trong database: {result['count'] if result else 0}")
+            
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"❌ Error initializing database: {e}")
         logger.error(traceback.format_exc())
+        raise e
     finally:
         if connection:
             connection.close()
 
-# Gọi init_db()
+# Gọi init_db() khi khởi động
 try:
     init_db()
+    logger.info("✅ Database initialization completed successfully")
 except Exception as e:
-    logger.warning(f"Could not initialize database on startup: {e}")
+    logger.error(f"❌ Could not initialize database on startup: {e}")
+
+# Hàm kiểm tra kết nối database
+def check_db_connection():
+    try:
+        connection = pymysql.connect(**MYSQL_CONFIG)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            if result and result.get('1') == 1:
+                return True, "✅ Kết nối database thành công!"
+        connection.close()
+        return True, "✅ Kết nối database thành công!"
+    except Exception as e:
+        error_msg = f"❌ Lỗi kết nối database: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
 
 # Middleware kiểm tra đăng nhập
 @app.before_request
 def check_login():
     # Các route không cần đăng nhập
-    public_routes = ['login', 'static', 'health', 'get_user_info', 'testConnection']
+    public_routes = ['login', 'static', 'health', 'get_user_info', 'testConnection', 'check_health']
     
     if request.endpoint in public_routes:
         return
@@ -143,6 +174,8 @@ def login():
                 session['fullname'] = user['fullname']
                 session['role'] = user['role']
                 
+                logger.info(f"✅ User {username} đăng nhập thành công")
+                
                 return jsonify({
                     'success': True,
                     'message': 'Đăng nhập thành công',
@@ -157,7 +190,7 @@ def login():
                 return jsonify({'success': False, 'message': 'Tên đăng nhập không tồn tại'})
                 
     except Exception as e:
-        logger.error(f"Lỗi đăng nhập: {str(e)}")
+        logger.error(f"❌ Lỗi đăng nhập: {str(e)}")
         return jsonify({'success': False, 'message': f'Lỗi hệ thống: {str(e)}'})
     finally:
         if connection:
@@ -188,10 +221,10 @@ def save_cccd():
     try:
         data = request.get_json()
         
-        logger.info(f"Nhận request saveCCCD từ user: {session.get('username')}")
+        logger.info(f"📥 Nhận request saveCCCD từ user: {session.get('username')}")
         
         if not data or 'cccd_moi' not in data:
-            logger.error("Thiếu số CCCD trong request")
+            logger.error("❌ Thiếu số CCCD trong request")
             return jsonify({
                 'success': False,
                 'error': 'missing_cccd',
@@ -201,19 +234,19 @@ def save_cccd():
         cccd_number = str(data['cccd_moi']).strip()
         
         if not cccd_number:
-            logger.error("Số CCCD rỗng")
+            logger.error("❌ Số CCCD rỗng")
             return jsonify({
                 'success': False,
                 'error': 'empty_cccd',
                 'message': 'Số CCCD không được để trống'
             }), 400
         
-        logger.info(f"Bắt đầu xử lý CCCD: {cccd_number}")
+        logger.info(f"🔍 Bắt đầu xử lý CCCD: {cccd_number}")
         
         # Kiểm tra trùng CCCD
         is_duplicate = check_duplicate_cccd(cccd_number)
         if is_duplicate:
-            logger.warning(f"CCCD {cccd_number} đã tồn tại")
+            logger.warning(f"⚠️ CCCD {cccd_number} đã tồn tại")
             return jsonify({
                 'success': False,
                 'error': 'duplicate',
@@ -221,21 +254,21 @@ def save_cccd():
                 'duplicateCCCD': cccd_number
             }), 400
         
-        logger.info("CCCD chưa tồn tại, tiếp tục xử lý...")
+        logger.info("✅ CCCD chưa tồn tại, tiếp tục xử lý...")
 
         # Lấy ảnh mặt trước và mặt sau
         front_base64 = data.get('front')
         back_base64 = data.get('back')
         
         if not front_base64 or not back_base64:
-            logger.error("Thiếu ảnh mặt trước hoặc mặt sau")
+            logger.error("❌ Thiếu ảnh mặt trước hoặc mặt sau")
             return jsonify({
                 'success': False,
                 'error': 'missing_images',
                 'message': 'Vui lòng chụp đầy đủ ảnh mặt trước và mặt sau CCCD.'
             }), 400
         
-        logger.info("Bắt đầu xử lý ảnh...")
+        logger.info("🖼️ Bắt đầu xử lý ảnh...")
 
         # Lưu vào database
         connection = None
@@ -274,19 +307,19 @@ def save_cccd():
                     issue_date,
                     data.get('phone', ''),
                     session.get('username'),
-                    front_base64,  # Lưu base64 trực tiếp
-                    back_base64    # Lưu base64 trực tiếp
+                    front_base64,
+                    back_base64
                 ))
             connection.commit()
-            logger.info(f"Đã lưu CCCD {cccd_number} vào database")
+            logger.info(f"✅ Đã lưu CCCD {cccd_number} vào database")
         except Exception as db_error:
-            logger.error(f"Lỗi khi lưu vào database: {db_error}")
+            logger.error(f"❌ Lỗi khi lưu vào database: {db_error}")
             raise
         finally:
             if connection:
                 connection.close()
 
-        logger.info(f"Hoàn tất xử lý CCCD {cccd_number}")
+        logger.info(f"🎉 Hoàn tất xử lý CCCD {cccd_number}")
         
         return jsonify({
             'success': True,
@@ -296,7 +329,7 @@ def save_cccd():
 
     except pymysql.err.IntegrityError as e:
         if 'Duplicate entry' in str(e):
-            logger.warning(f"CCCD {cccd_number} đã tồn tại (lỗi integrity)")
+            logger.warning(f"⚠️ CCCD {cccd_number} đã tồn tại (lỗi integrity)")
             return jsonify({
                 'success': False,
                 'error': 'duplicate',
@@ -304,21 +337,21 @@ def save_cccd():
                 'duplicateCCCD': cccd_number
             }), 400
         else:
-            logger.error(f"Database integrity error: {str(e)}")
+            logger.error(f"❌ Database integrity error: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': 'database_error',
                 'message': f'Lỗi cơ sở dữ liệu: {str(e)}'
             }), 500
     except pymysql.err.OperationalError as e:
-        logger.error(f"Database connection error: {str(e)}")
+        logger.error(f"❌ Database connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
             'message': 'Không thể kết nối đến cơ sở dữ liệu. Vui lòng thử lại sau.'
         }), 500
     except Exception as e:
-        logger.error(f"Lỗi server khi saveCCCD: {str(e)}")
+        logger.error(f"❌ Lỗi server khi saveCCCD: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
@@ -332,14 +365,14 @@ def check_duplicate():
         data = request.get_json()
         cccd_number = str(data.get('cccd', '')).strip()
         
-        logger.info(f"Kiểm tra trùng CCCD: {cccd_number}")
+        logger.info(f"🔍 Kiểm tra trùng CCCD: {cccd_number}")
         
         is_duplicate = check_duplicate_cccd(cccd_number)
         
         return jsonify({'duplicate': is_duplicate})
     
     except Exception as e:
-        logger.error(f"Lỗi kiểm tra trùng: {str(e)}")
+        logger.error(f"❌ Lỗi kiểm tra trùng: {str(e)}")
         return jsonify({'duplicate': False})
 
 @app.route('/get_records', methods=['GET'])
@@ -368,7 +401,7 @@ def get_records():
                 count_result = cursor.fetchone()
                 total = count_result['total'] if count_result else 0
                 
-                # Lấy dữ liệu (không bao gồm ảnh để tối ưu hiệu năng)
+                # Lấy dữ liệu
                 sql = """
                     SELECT id, cccd_moi, cmnd_cu, name, dob, gender, address, issue_date, phone, user, created_at 
                     FROM cccd_records 
@@ -404,14 +437,14 @@ def get_records():
                 })
                 
         except Exception as e:
-            logger.error(f"Lỗi khi lấy records: {str(e)}")
+            logger.error(f"❌ Lỗi khi lấy records: {str(e)}")
             return jsonify({'success': False, 'message': str(e)})
         finally:
             if connection:
                 connection.close()
                 
     except Exception as e:
-        logger.error(f"Lỗi get_records: {str(e)}")
+        logger.error(f"❌ Lỗi get_records: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/get_record_detail/<int:record_id>', methods=['GET'])
@@ -445,14 +478,14 @@ def get_record_detail(record_id):
                 })
                 
         except Exception as e:
-            logger.error(f"Lỗi khi lấy chi tiết record: {str(e)}")
+            logger.error(f"❌ Lỗi khi lấy chi tiết record: {str(e)}")
             return jsonify({'success': False, 'message': str(e)})
         finally:
             if connection:
                 connection.close()
                 
     except Exception as e:
-        logger.error(f"Lỗi get_record_detail: {str(e)}")
+        logger.error(f"❌ Lỗi get_record_detail: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 def check_duplicate_cccd(cccd_number):
@@ -467,7 +500,7 @@ def check_duplicate_cccd(cccd_number):
         return count > 0
     
     except Exception as e:
-        logger.error(f"Lỗi kiểm tra trùng CCCD: {str(e)}")
+        logger.error(f"❌ Lỗi kiểm tra trùng CCCD: {str(e)}")
         return False
     finally:
         if connection:
@@ -477,30 +510,48 @@ def check_duplicate_cccd(cccd_number):
 def test_connection():
     try:
         # Kiểm tra kết nối database
-        connection = None
-        db_status = "connected"
+        db_success, db_message = check_db_connection()
+        
+        # Kiểm tra OpenCV
+        cv2_success = True
+        cv2_message = "✅ OpenCV đã sẵn sàng"
+        
+        # Kiểm tra QR code detector
         try:
-            connection = pymysql.connect(**MYSQL_CONFIG)
-            with connection.cursor() as cursor:
-                cursor.execute('SELECT 1')
-                result = cursor.fetchone()
-            db_status = "connected"
-            logger.info("Kiểm tra kết nối database: THÀNH CÔNG")
-        except Exception as db_error:
-            db_status = f"error: {str(db_error)}"
-            logger.error(f"Kiểm tra kết nối database: THẤT BẠI - {str(db_error)}")
-        finally:
-            if connection:
-                connection.close()
+            detector = cv2.QRCodeDetector()
+            cv2_success = True
+            cv2_message = "✅ OpenCV QR Code Detector đã sẵn sàng"
+        except Exception as cv_error:
+            cv2_success = False
+            cv2_message = f"⚠️ OpenCV QR Code Detector: {str(cv_error)}"
+        
+        # Trạng thái tổng thể
+        if db_success and cv2_success:
+            status = 'ok'
+            message = 'Tất cả hệ thống hoạt động bình thường'
+        else:
+            status = 'warning'
+            message = 'Một số hệ thống có vấn đề'
         
         return jsonify({
-            'status': 'ok',
-            'databaseStatus': db_status,
-            'message': 'Kết nối thành công'
+            'status': status,
+            'message': message,
+            'database': {
+                'success': db_success,
+                'message': db_message,
+                'host': DB_HOST,
+                'port': DB_PORT,
+                'database': DB_NAME
+            },
+            'opencv': {
+                'success': cv2_success,
+                'message': cv2_message,
+                'version': cv2.__version__
+            }
         })
     
     except Exception as e:
-        logger.error(f"Lỗi testConnection: {str(e)}")
+        logger.error(f"❌ Lỗi testConnection: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -509,20 +560,32 @@ def test_connection():
 @app.route('/health')
 def health_check():
     try:
-        # Kiểm tra kết nối database
+        db_success, db_message = check_db_connection()
+        
+        return jsonify({
+            'status': 'healthy' if db_success else 'unhealthy', 
+            'database': db_message,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/check_health')
+def check_health():
+    """Endpoint đơn giản để kiểm tra sức khỏe hệ thống"""
+    try:
         connection = pymysql.connect(**MYSQL_CONFIG)
         connection.close()
-        db_status = 'connected'
+        return jsonify({'status': 'healthy', 'message': 'Hệ thống hoạt động bình thường'})
     except Exception as e:
-        db_status = f'error: {str(e)}'
-    
-    return jsonify({
-        'status': 'healthy', 
-        'database': db_status
-    })
+        return jsonify({'status': 'unhealthy', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    logger.info(f"Ứng dụng khởi động trên cổng {port}")
-    logger.info(f"Database config: host={DB_HOST}, port={DB_PORT}, user={DB_USER}, database={DB_NAME}")
+    logger.info(f"🚀 Ứng dụng khởi động trên cổng {port}")
+    logger.info(f"📊 Database: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+    logger.info(f"🖥️ OpenCV version: {cv2.__version__}")
     app.run(host='0.0.0.0', port=port, debug=False)
