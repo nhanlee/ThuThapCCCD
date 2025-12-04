@@ -21,12 +21,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.2); /* Rất trong suốt */
             z-index: 10;
             pointer-events: none;
         }
         
-        /* QR Frame vẫn giữ nguyên với zoom 3x */
         .qr-frame {
             position: absolute;
             top: 50%;
@@ -37,7 +36,7 @@
             border: 3px solid #10B981;
             border-radius: 20px;
             box-shadow: 
-                0 0 0 2000px rgba(0, 0, 0, 0.2),
+                0 0 0 2000px rgba(0, 0, 0, 0.2), /* Giảm mạnh độ mờ */
                 inset 0 0 20px rgba(16, 185, 129, 0.5);
             animation: pulse 2s infinite;
         }
@@ -109,43 +108,32 @@
             }
         }
         
-        /* Khung chụp CCCD nằm ngang, không zoom */
         .id-frame {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%; /* Chiều rộng khung */
-            height: 50%; /* Chiều cao khung (tỷ lệ ngang) */
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 80%;
             border: 3px solid #F59E0B;
             border-radius: 10px;
             box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.2);
         }
         
-        /* Khung chụp chữ ký nhỏ hơn */
-        .signature-frame {
+        .face-frame {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 60%; /* Chiều rộng nhỏ hơn */
-            height: 30%; /* Chiều cao nhỏ hơn */
-            border: 3px solid #8B5CF6;
-            border-radius: 10px;
-            box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.2);
+            bottom: 20%;
+            left: 10%;
+            width: 25%;
+            height: 30%;
+            border: 2px dashed #10B981;
+            border-radius: 5px;
         }
         
-        /* Camera phóng to 3x chỉ cho QR scan - ĐÃ KHÔI PHỤC */
+        /* Camera phóng to 3x */
         .qr-video-zoom {
-            transform: scale(3); /* Phóng to 3x - ĐÃ KHÔI PHỤC */
+            transform: scale(3); /* Phóng to 3x */
             transform-origin: center center;
             transition: transform 0.3s ease;
-        }
-        
-        /* Camera bình thường cho chụp ảnh CCCD */
-        .normal-video {
-            transform: scale(1);
-            transform-origin: center center;
         }
         
         /* Container để giữ kích thước và crop video phóng to */
@@ -374,7 +362,7 @@
                                 </div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Xem Dữ Liệu</h3>
                                 <p class="text-gray-600 text-center mb-4">
-                                    Tìm kiếm và quản lý dữ liệu
+                                    Xem lại thông tin CCCD đã quét, tìm kiếm và quản lý dữ liệu
                                 </p>
                                 <div class="flex justify-center">
                                     <span class="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium">
@@ -487,18 +475,6 @@
                                     4
                                 </div>
                                 <div class="ml-3">
-                                    <p class="font-medium text-gray-600">Chữ ký</p>
-                                    <p class="text-sm text-gray-500">Chụp ảnh chữ ký</p>
-                                </div>
-                            </div>
-                            
-                            <div class="h-1 w-16 bg-gray-300"></div>
-                            
-                            <div class="flex items-center">
-                                <div id="step5" class="step w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
-                                    5
-                                </div>
-                                <div class="ml-3">
                                     <p class="font-medium text-gray-600">Xác nhận</p>
                                     <p class="text-sm text-gray-500">Kiểm tra & Lưu thông tin</p>
                                 </div>
@@ -506,7 +482,7 @@
                         </div>
                     </div>
                     
-                    <!-- Step 1: QR Scan - ĐÃ KHÔI PHỤC ZOOM 3X -->
+                    <!-- Step 1: QR Scan -->
                     <div id="step1Content" class="fade-in">
                         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                             <div class="p-6 border-b">
@@ -515,12 +491,15 @@
                                     Bước 1: Quét Mã QR CCCD
                                 </h3>
                                 <p class="text-gray-600 mt-1">Đưa mã QR vào khung hình. Hệ thống tự động quét bằng jsQR</p>
+                                <div class="mt-2 text-sm text-blue-600">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Camera đang được phóng to 3x để quét chính xác hơn
+                                </div>
                             </div>
                             
                             <div class="p-6">
                                 <div class="camera-container rounded-lg overflow-hidden" style="height: 500px;">
                                     <div class="camera-zoom-container">
-                                        <!-- ĐÃ KHÔI PHỤC ZOOM 3X -->
                                         <video id="camera" autoplay playsinline class="w-full h-full object-cover qr-video-zoom"></video>
                                     </div>
                                     <div class="qr-overlay">
@@ -566,7 +545,7 @@
                                                 <p class="font-medium text-blue-800">Hướng dẫn quét QR</p>
                                                 <p class="text-sm text-blue-600 mt-1">
                                                     Đưa mã QR CCCD vào khung hình màu xanh. Hệ thống sẽ tự động nhận diện bằng jsQR.
-                                                    <strong>Camera đang phóng to 3x để quét chính xác.</strong> Giữ yên camera để quét chính xác.
+                                                    Giữ yên camera để quét chính xác.
                                                 </p>
                                             </div>
                                         </div>
@@ -576,7 +555,7 @@
                         </div>
                     </div>
                     
-                    <!-- Step 2: Front Side - KHÔNG ZOOM, NẰM NGANG -->
+                    <!-- Step 2: Front Side -->
                     <div id="step2Content" class="hidden fade-in">
                         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                             <div class="p-6 border-b">
@@ -584,16 +563,15 @@
                                     <i class="fas fa-camera text-blue-500 mr-2"></i>
                                     Bước 2: Chụp Mặt Trước CCCD
                                 </h3>
-                                <p class="text-gray-600 mt-1">Đưa mặt trước CCCD vào khung (không zoom, nằm ngang)</p>
+                                <p class="text-gray-600 mt-1">Đưa mặt trước CCCD vào khung</p>
                             </div>
                             
                             <div class="p-6">
                                 <div class="camera-container rounded-lg overflow-hidden" style="height: 500px;">
-                                    <!-- KHÔNG ZOOM -->
-                                    <video id="camFront" autoplay playsinline class="w-full h-full object-cover normal-video"></video>
+                                    <video id="camFront" autoplay playsinline class="w-full h-full object-cover"></video>
                                     <div class="qr-overlay">
                                         <div class="id-frame"></div>
-                                        <!-- Đã bỏ khung xanh lá (face-frame) -->
+                                        <div class="face-frame"></div>
                                     </div>
                                 </div>
                                 
@@ -624,7 +602,7 @@
                         </div>
                     </div>
                     
-                    <!-- Step 3: Back Side - KHÔNG ZOOM, NẰM NGANG -->
+                    <!-- Step 3: Back Side -->
                     <div id="step3Content" class="hidden fade-in">
                         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                             <div class="p-6 border-b">
@@ -632,13 +610,12 @@
                                     <i class="fas fa-camera text-blue-500 mr-2"></i>
                                     Bước 3: Chụp Mặt Sau CCCD
                                 </h3>
-                                <p class="text-gray-600 mt-1">Lật CCCD và đưa mặt sau vào khung (không zoom, nằm ngang)</p>
+                                <p class="text-gray-600 mt-1">Lật CCCD và đưa mặt sau vào khung</p>
                             </div>
                             
                             <div class="p-6">
                                 <div class="camera-container rounded-lg overflow-hidden" style="height: 500px;">
-                                    <!-- KHÔNG ZOOM -->
-                                    <video id="camBack" autoplay playsinline class="w-full h-full object-cover normal-video"></video>
+                                    <video id="camBack" autoplay playsinline class="w-full h-full object-cover"></video>
                                     <div class="qr-overlay">
                                         <div class="id-frame"></div>
                                     </div>
@@ -671,60 +648,13 @@
                         </div>
                     </div>
                     
-                    <!-- Step 4: Signature - KHÔNG ZOOM, NẰM NGANG -->
+                    <!-- Step 4: Confirm Information -->
                     <div id="step4Content" class="hidden fade-in">
                         <div class="bg-white rounded-xl shadow-lg overflow-hidden">
                             <div class="p-6 border-b">
                                 <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                                    <i class="fas fa-signature text-blue-500 mr-2"></i>
-                                    Bước 4: Chụp Chữ Ký
-                                </h3>
-                                <p class="text-gray-600 mt-1">Đưa phần chữ ký vào khung (không zoom, nằm ngang)</p>
-                            </div>
-                            
-                            <div class="p-6">
-                                <div class="camera-container rounded-lg overflow-hidden" style="height: 500px;">
-                                    <!-- KHÔNG ZOOM -->
-                                    <video id="camSignature" autoplay playsinline class="w-full h-full object-cover normal-video"></video>
-                                    <div class="qr-overlay">
-                                        <div class="signature-frame"></div>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-6 flex justify-center space-x-4">
-                                    <button id="torchBtnSignature" onclick="toggleTorch('torchBtnSignature')" 
-                                            class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center">
-                                        <i class="fas fa-lightbulb mr-2"></i>
-                                        Bật đèn
-                                    </button>
-                                    
-                                    <button onclick="captureInFrame('signature')" 
-                                            class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 flex items-center">
-                                        <i class="fas fa-camera mr-2"></i>
-                                        Chụp ảnh
-                                    </button>
-                                    
-                                    <button id="focusBtnSignature" onclick="triggerFocus('focusBtnSignature')" 
-                                            class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center">
-                                        <i class="fas fa-eye mr-2"></i>
-                                        Lấy nét
-                                    </button>
-                                </div>
-                                
-                                <div class="mt-6">
-                                    <img id="imgSignature" class="capture-preview w-full rounded-lg hidden">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Step 5: Confirm Information -->
-                    <div id="step5Content" class="hidden fade-in">
-                        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-                            <div class="p-6 border-b">
-                                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                                     <i class="fas fa-check-circle text-blue-500 mr-2"></i>
-                                    Bước 5: Xác Nhận Thông Tin
+                                    Bước 4: Xác Nhận Thông Tin
                                 </h3>
                                 <p class="text-gray-600 mt-1">Kiểm tra và xác nhận thông tin trước khi lưu</p>
                             </div>
@@ -768,7 +698,7 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="imagePreviews">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="imagePreviews">
                                         <!-- Ảnh preview sẽ được hiển thị ở đây -->
                                     </div>
                                     
@@ -921,7 +851,73 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Stats -->
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-id-card text-blue-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Tổng số bản ghi</p>
+                                    <p id="totalRecordsCount" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-user text-green-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Người dùng hiện tại</p>
+                                    <p id="currentUserRecords" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-calendar text-purple-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Hôm nay</p>
+                                    <p id="todayRecords" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-images text-orange-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Ảnh đã lưu</p>
+                                    <p id="imagesSaved" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Record Details -->
+    <div id="recordModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-xl bg-white">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-900">
+                    <i class="fas fa-id-card mr-2"></i>
+                    Chi Tiết CCCD
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div id="modalContent" class="space-y-6">
+                <!-- Nội dung modal sẽ được tải ở đây -->
             </div>
         </div>
     </div>
@@ -932,7 +928,6 @@
         let qrData = null;
         let frontImg = null;
         let backImg = null;
-        let signatureImg = null;
         let currentStream = null;
         let scanInterval = null;
         let scanAttempts = 0;
@@ -1209,7 +1204,8 @@
                     video: {
                         facingMode: "environment",
                         width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        height: { ideal: 1080 },
+                        zoom: { ideal: 3 } // Yêu cầu zoom 3x
                     }
                 };
                 
@@ -1220,23 +1216,27 @@
                 const camera = document.getElementById("camera");
                 const camFront = document.getElementById("camFront");
                 const camBack = document.getElementById("camBack");
-                const camSignature = document.getElementById("camSignature");
                 
                 if (camera) {
                     camera.srcObject = stream;
-                    camera.classList.add("qr-video-zoom"); // ZOOM 3X CHO QR SCAN
+                    camera.classList.add("qr-video-zoom"); // Thêm class zoom
                 }
-                if (camFront) {
-                    camFront.srcObject = stream;
-                    camFront.classList.add("normal-video"); // KHÔNG ZOOM CHO CHỤP ẢNH
-                }
-                if (camBack) {
-                    camBack.srcObject = stream;
-                    camBack.classList.add("normal-video"); // KHÔNG ZOOM CHO CHỤP ẢNH
-                }
-                if (camSignature) {
-                    camSignature.srcObject = stream;
-                    camSignature.classList.add("normal-video"); // KHÔNG ZOOM CHO CHỤP ẢNH
+                if (camFront) camFront.srcObject = stream;
+                if (camBack) camBack.srcObject = stream;
+                
+                // Thử áp dụng zoom thông qua constraints
+                try {
+                    const track = stream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    if (capabilities.zoom) {
+                        await track.applyConstraints({
+                            advanced: [{ zoom: 3 }]
+                        });
+                        console.log("Đã áp dụng zoom 3x cho camera");
+                    }
+                } catch (zoomError) {
+                    console.warn("Không thể áp dụng zoom:", zoomError);
                 }
                 
                 // Bắt đầu quét tự động sau khi camera sẵn sàng
@@ -1264,24 +1264,6 @@
                     if (camera) {
                         camera.srcObject = stream;
                         camera.classList.add("qr-video-zoom");
-                    }
-                    
-                    const camFront = document.getElementById("camFront");
-                    if (camFront) {
-                        camFront.srcObject = stream;
-                        camFront.classList.add("normal-video");
-                    }
-                    
-                    const camBack = document.getElementById("camBack");
-                    if (camBack) {
-                        camBack.srcObject = stream;
-                        camBack.classList.add("normal-video");
-                    }
-                    
-                    const camSignature = document.getElementById("camSignature");
-                    if (camSignature) {
-                        camSignature.srcObject = stream;
-                        camSignature.classList.add("normal-video");
                     }
                     
                     setTimeout(() => {
@@ -1524,12 +1506,12 @@
                 }
             });
             
-            // Chỉ zoom camera ở bước quét QR (bước 1)
+            // Tắt hiệu ứng zoom khi không ở bước quét QR
             const camera = document.getElementById("camera");
-            if (stepNumber === 1) {
-                camera.classList.add("qr-video-zoom");
-            } else {
+            if (stepNumber !== 1) {
                 camera.classList.remove("qr-video-zoom");
+            } else {
+                camera.classList.add("qr-video-zoom");
             }
         }
 
@@ -1588,12 +1570,8 @@
 
         // Chụp ảnh trong khung
         async function captureInFrame(type) {
-            const videoId = type === 'front' ? 'camFront' : 
-                           type === 'back' ? 'camBack' : 
-                           'camSignature';
-            const previewId = type === 'front' ? 'imgFront' : 
-                             type === 'back' ? 'imgBack' : 
-                             'imgSignature';
+            const videoId = type === 'front' ? 'camFront' : 'camBack';
+            const previewId = type === 'front' ? 'imgFront' : 'imgBack';
             
             const video = document.getElementById(videoId);
             if (!video || !video.videoWidth || !video.videoHeight) {
@@ -1607,22 +1585,11 @@
             const videoWidth = video.videoWidth;
             const videoHeight = video.videoHeight;
             
-            // Khung chụp cho CCCD (nằm ngang, 80% chiều rộng, 50% chiều cao)
-            let frameX, frameY, frameWidth, frameHeight;
-            
-            if (type === 'front' || type === 'back') {
-                // Khung cho CCCD: nằm ngang, chiều cao 50%, chiều rộng 80%
-                frameWidth = videoWidth * 0.8;
-                frameHeight = videoHeight * 0.5;
-                frameX = (videoWidth - frameWidth) / 2;
-                frameY = (videoHeight - frameHeight) / 2;
-            } else {
-                // Khung cho chữ ký: nhỏ hơn, nằm ngang
-                frameWidth = videoWidth * 0.6;
-                frameHeight = videoHeight * 0.3;
-                frameX = (videoWidth - frameWidth) / 2;
-                frameY = (videoHeight - frameHeight) / 2;
-            }
+            // Khung chụp chiếm 80% chiều rộng và 80% chiều cao, căn giữa
+            const frameX = videoWidth * 0.1;
+            const frameY = videoHeight * 0.1;
+            const frameWidth = videoWidth * 0.8;
+            const frameHeight = videoHeight * 0.8;
             
             canvas.width = frameWidth;
             canvas.height = frameHeight;
@@ -1648,19 +1615,12 @@
                     setTimeout(() => {
                         showStep(3);
                     }, 1000);
-                } else if (type === 'back') {
+                } else {
                     backImg = img64;
                     showToast("Đã chụp mặt sau thành công!", "success");
                     
                     setTimeout(() => {
                         showStep(4);
-                    }, 1000);
-                } else {
-                    signatureImg = img64;
-                    showToast("Đã chụp chữ ký thành công!", "success");
-                    
-                    setTimeout(() => {
-                        showStep(5);
                         displayQRInfo();
                     }, 1000);
                 }
@@ -1728,15 +1688,6 @@
                         <img src="${backImg}" class="w-full h-48 object-cover rounded-lg border border-gray-200">
                     </div>
                 </div>
-                <div class="col-span-1">
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h5 class="font-medium text-gray-900 mb-3 flex items-center">
-                            <i class="fas fa-signature mr-2"></i>
-                            Chữ ký
-                        </h5>
-                        <img src="${signatureImg}" class="w-full h-48 object-cover rounded-lg border border-gray-200">
-                    </div>
-                </div>
             `;
         }
 
@@ -1748,7 +1699,7 @@
 
         // Lưu dữ liệu
         async function saveData() {
-            if (!qrData || !frontImg || !backImg || !signatureImg) {
+            if (!qrData || !frontImg || !backImg) {
                 showToast("Vui lòng hoàn tất các bước trước khi lưu!", "warning");
                 return;
             }
@@ -1769,8 +1720,7 @@
                 issue_date: qrData.issue_date,
                 phone: phone,
                 front: extractBase64Data(frontImg),
-                back: extractBase64Data(backImg),
-                signature: extractBase64Data(signatureImg)
+                back: extractBase64Data(backImg)
             };
 
             const saveBtn = document.querySelector('[onclick="saveData()"]');
@@ -1779,7 +1729,7 @@
             saveBtn.disabled = true;
 
             try {
-                const response = await fetch('/saveID', {
+                const response = await fetch('/saveCCCD', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1857,12 +1807,10 @@
             qrData = null;
             frontImg = null;
             backImg = null;
-            signatureImg = null;
             scanAttempts = 0;
             
             document.getElementById("imgFront").classList.add("hidden");
             document.getElementById("imgBack").classList.add("hidden");
-            document.getElementById("imgSignature").classList.add("hidden");
             document.getElementById("scanAttempts").textContent = "0";
             document.getElementById("scanTime").textContent = "0 giây";
             document.getElementById("phoneInput").value = "";
@@ -1962,7 +1910,7 @@
         function updateRecordsStats(total) {
             document.getElementById('currentUserRecords').textContent = total;
             document.getElementById('todayRecords').textContent = '0';
-            document.getElementById('imagesSaved').textContent = total * 3; // 3 ảnh mỗi record
+            document.getElementById('imagesSaved').textContent = total * 2;
         }
 
         // Tìm kiếm records
@@ -2056,7 +2004,7 @@
                     </div>
                 </div>
                 
-                <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     ${record.front_image ? `
                         <div class="text-center">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Mặt trước</label>
@@ -2071,15 +2019,6 @@
                             <label class="block text-sm font-medium text-gray-700 mb-2">Mặt sau</label>
                             <div class="relative">
                                 <img src="${record.back_image}" class="w-full h-48 object-cover rounded-lg border border-gray-300">
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    ${record.signature_image ? `
-                        <div class="text-center">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Chữ ký</label>
-                            <div class="relative">
-                                <img src="${record.signature_image}" class="w-full h-48 object-cover rounded-lg border border-gray-300">
                             </div>
                         </div>
                     ` : ''}
