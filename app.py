@@ -55,9 +55,9 @@ def init_db():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
             
-            # Tạo bảng cccd_records
+            # Tạo bảng id_records
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS `cccd_records` (
+                CREATE TABLE IF NOT EXISTS `id_records` (
                     `id` INT AUTO_INCREMENT PRIMARY KEY,
                     `cccd_moi` VARCHAR(50) UNIQUE NOT NULL,
                     `cmnd_cu` VARCHAR(50),
@@ -93,7 +93,7 @@ def init_db():
         
         # Đếm số lượng records
         with connection.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) as count FROM cccd_records")
+            cursor.execute("SELECT COUNT(*) as count FROM id_records")
             result = cursor.fetchone()
             logger.info(f"Số lượng records trong database: {result['count'] if result else 0}")
             
@@ -273,7 +273,7 @@ def save_cccd():
             
             with connection.cursor() as cursor:
                 sql = '''
-                    INSERT INTO cccd_records 
+                    INSERT INTO id_records 
                     (cccd_moi, cmnd_cu, name, dob, gender, address, issue_date, phone, user, front_image, back_image)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 '''
@@ -385,7 +385,7 @@ def get_records():
             
             with connection.cursor() as cursor:
                 # Đếm tổng số bản ghi
-                count_sql = "SELECT COUNT(*) as total FROM cccd_records"
+                count_sql = "SELECT COUNT(*) as total FROM id_records"
                 count_params = []
                 
                 if search:
@@ -400,7 +400,7 @@ def get_records():
                 # Lấy dữ liệu
                 sql = """
                     SELECT id, cccd_moi, cmnd_cu, name, dob, gender, address, issue_date, phone, user, created_at 
-                    FROM cccd_records 
+                    FROM id_records 
                 """
                 params = []
                 
@@ -452,7 +452,7 @@ def get_record_detail(record_id):
             
             with connection.cursor() as cursor:
                 sql = """
-                    SELECT * FROM cccd_records WHERE id = %s
+                    SELECT * FROM id_records WHERE id = %s
                 """
                 cursor.execute(sql, (record_id,))
                 record = cursor.fetchone()
@@ -490,7 +490,7 @@ def check_duplicate_cccd(cccd_number):
     try:
         connection = pymysql.connect(**MYSQL_CONFIG)
         with connection.cursor() as cursor:
-            cursor.execute('SELECT COUNT(*) as count FROM cccd_records WHERE cccd_moi = %s', (cccd_number,))
+            cursor.execute('SELECT COUNT(*) as count FROM id_records WHERE cccd_moi = %s', (cccd_number,))
             result = cursor.fetchone()
             count = result['count'] if result else 0
         return count > 0
