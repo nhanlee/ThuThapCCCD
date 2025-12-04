@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quét CCCD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .camera-container {
+            position: relative;
+            background: #000;
+            overflow: hidden;
+        }
+        
+        .qr-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10;
+        }
+        
+        .qr-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            border: 3px solid #10B981;
+            border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+        }
+        
+        .qr-frame-corner {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 3px solid transparent;
+        }
+        
+        .qr-frame-corner:nth-child(1) {
+            top: -3px;
+            left: -3px;
+            border-top-color: #10B981;
+            border-left-color: #10B981;
+        }
+        
+        .qr-frame-corner:nth-child(2) {
+            top: -3px;
+            right: -3px;
+            border-top-color: #10B981;
+            border-right-color: #10B981;
+        }
+        
+        .qr-frame-corner:nth-child(3) {
+            bottom: -3px;
+            left: -3px;
+            border-bottom-color: #10B981;
+            border-left-color: #10B981;
+        }
+        
+        .qr-frame-corner:nth-child(4) {
+            bottom: -3px;
+            right: -3px;
+            border-bottom-color: #10B981;
+            border-right-color: #10B981;
+        }
+        
+        .id-frame {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 80%;
+            border: 3px solid #F59E0B;
+            border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+        }
+        
+        .face-frame {
+            position: absolute;
+            bottom: 20%;
+            left: 10%;
+            width: 25%;
+            height: 30%;
+            border: 2px dashed #10B981;
+            border-radius: 5px;
+        }
+        
+        .scanning-line {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            width: 80%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #10B981, transparent);
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { top: 10%; }
+            100% { top: 90%; }
+        }
+        
+        .preview-image {
+            transition: all 0.3s ease;
+        }
+        
+        .preview-image:hover {
+            transform: scale(1.05);
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <div class="bg-white rounded-lg shadow-lg p-4 max-w-sm">
+            <div class="flex items-start">
+                <div id="toastIcon" class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                </div>
+                <div class="ml-3 w-0 flex-1">
+                    <p id="toastMessage" class="text-sm font-medium text-gray-900"></p>
+                </div>
+                <button onclick="hideToast()" class="ml-4 flex-shrink-0">
+                    <i class="fas fa-times text-gray-400"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app" class="min-h-screen">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="min-h-screen flex flex-col items-center justify-center p-4">
+            <div class="w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="inline-block p-4 bg-blue-100 rounded-full mb-4">
+                        <i class="fas fa-id-card text-blue-600 text-4xl"></i>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">Hệ Thống Quét CCCD</h1>
+                    <p class="text-gray-600">Đăng nhập để sử dụng hệ thống</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-8">
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-medium mb-2">
+                            <i class="fas fa-user mr-2"></i>Tên đăng nhập
+                        </label>
+                        <input type="text" id="username" 
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition duration-200"
+                               placeholder="Nhập tên đăng nhập">
+                    </div>
+                    
+                    <div class="mb-6">
+                        <div class="flex items-center text-sm text-gray-600 mb-2">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <span>Chỉ cần nhập tên đăng nhập (không cần mật khẩu)</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            Tên đăng nhập mẫu: admin, user1, user2
+                        </div>
+                    </div>
+                    
+                    <button onclick="login()" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Đăng nhập
+                    </button>
+                    
+                    <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-database mr-2"></i>
+                            <span id="dbStatus">Đang kiểm tra kết nối database...</span>
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600 mt-2">
+                            <i class="fas fa-robot mr-2"></i>
+                            <span id="aiStatus">Đang kiểm tra AI...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App (hidden by default) -->
+        <div id="mainApp" class="min-h-screen hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between items-center py-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-id-card text-blue-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h1 class="text-xl font-semibold text-gray-900">Hệ Thống Quét CCCD</h1>
+                                <p class="text-sm text-gray-600" id="userInfo">Đang tải thông tin...</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="hidden sm:block">
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                        <span class="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+                                        <span id="connectionStatus">Đang kết nối...</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <button onclick="logout()" 
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                                <i class="fas fa-sign-out-alt mr-2"></i>
+                                Đăng xuất
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard -->
+            <div id="dashboardScreen" class="py-8">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center mb-12">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">Chào mừng trở lại!</h2>
+                        <p class="text-lg text-gray-600">Chọn chức năng bạn muốn sử dụng</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                        <!-- Scan Card -->
+                        <div class="card-hover bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer" onclick="showScanScreen()">
+                            <div class="p-6">
+                                <div class="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6 mx-auto">
+                                    <i class="fas fa-qrcode text-blue-600 text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Quét CCCD</h3>
+                                <p class="text-gray-600 text-center mb-4">
+                                    Quét mã QR và chụp ảnh CCCD tự động với nhận diện khuôn mặt AI
+                                </p>
+                                <div class="flex justify-center">
+                                    <span class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                        <i class="fas fa-play mr-2"></i>
+                                        Bắt đầu quét
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="bg-blue-50 px-6 py-4">
+                                <div class="flex items-center text-sm text-blue-700">
+                                    <i class="fas fa-bolt mr-2"></i>
+                                    <span>Tự động nhận diện khuôn mặt bằng AI</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- View Records -->
+                        <div class="card-hover bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer" onclick="showRecordsScreen()">
+                            <div class="p-6">
+                                <div class="flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6 mx-auto">
+                                    <i class="fas fa-database text-green-600 text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Xem Dữ Liệu</h3>
+                                <p class="text-gray-600 text-center mb-4">
+                                    Xem lại thông tin CCCD đã quét, tìm kiếm và quản lý dữ liệu
+                                </p>
+                                <div class="flex justify-center">
+                                    <span class="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                                        <i class="fas fa-list mr-2"></i>
+                                        Xem danh sách
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="bg-green-50 px-6 py-4">
+                                <div class="flex items-center text-sm text-green-700">
+                                    <i class="fas fa-search mr-2"></i>
+                                    <span>Tìm kiếm và lọc thông tin dễ dàng</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-id-card text-blue-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Tổng số CCCD</p>
+                                    <p id="totalRecords" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-robot text-green-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">AI Nhận diện</p>
+                                    <p id="aiStatusMain" class="text-2xl font-semibold text-gray-900">Đang tải...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-database text-purple-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Database</p>
+                                    <p id="dbStatusMain" class="text-2xl font-semibold text-gray-900">Đang kiểm tra...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scan Screen -->
+            <div id="scanScreen" class="hidden">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <!-- Back Button -->
+                    <div class="mb-6">
+                        <button onclick="showDashboard()" 
+                                class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Quay lại Dashboard
+                        </button>
+                    </div>
+                    
+                    <!-- Progress Steps -->
+                    <div class="mb-8">
+                        <div class="flex items-center justify-between max-w-3xl mx-auto">
+                            <div class="flex items-center">
+                                <div id="step1" class="step w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                                    1
+                                </div>
+                                <div class="ml-3">
+                                    <p class="font-medium text-gray-900">Quét QR</p>
+                                    <p class="text-sm text-gray-600">Quét mã QR CCCD</p>
+                                </div>
+                            </div>
+                            
+                            <div class="h-1 w-16 bg-gray-300"></div>
+                            
+                            <div class="flex items-center">
+                                <div id="step2" class="step w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
+                                    2
+                                </div>
+                                <div class="ml-3">
+                                    <p class="font-medium text-gray-600">Mặt trước</p>
+                                    <p class="text-sm text-gray-500">Chụp mặt trước CCCD</p>
+                                </div>
+                            </div>
+                            
+                            <div class="h-1 w-16 bg-gray-300"></div>
+                            
+                            <div class="flex items-center">
+                                <div id="step3" class="step w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
+                                    3
+                                </div>
+                                <div class="ml-3">
+                                    <p class="font-medium text-gray-600">Mặt sau</p>
+                                    <p class="text-sm text-gray-500">Chụp mặt sau CCCD</p>
+                                </div>
+                            </div>
+                            
+                            <div class="h-1 w-16 bg-gray-300"></div>
+                            
+                            <div class="flex items-center">
+                                <div id="step4" class="step w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold">
+                                    4
+                                </div>
+                                <div class="ml-3">
+                                    <p class="font-medium text-gray-600">Xác nhận</p>
+                                    <p class="text-sm text-gray-500">Kiểm tra & Lưu thông tin</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 1: QR Scan -->
+                    <div id="step1Content" class="fade-in">
+                        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div class="p-6 border-b">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                    <i class="fas fa-qrcode text-blue-500 mr-2"></i>
+                                    Bước 1: Quét Mã QR CCCD
+                                </h3>
+                                <p class="text-gray-600 mt-1">Đưa mã QR vào khung hình để quét tự động</p>
+                            </div>
+                            
+                            <div class="p-6">
+                                <div class="camera-container rounded-lg overflow-hidden" style="height: 400px;">
+                                    <video id="camera" autoplay playsinline class="w-full h-full object-cover"></video>
+                                    <div class="qr-overlay">
+                                        <div class="qr-frame">
+                                            <div class="qr-frame-corner"></div>
+                                            <div class="qr-frame-corner"></div>
+                                            <div class="qr-frame-corner"></div>
+                                            <div class="qr-frame-corner"></div>
+                                            <div class="scanning-line"></div>
+                                        </div>
+                                        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-white z-20">
+                                            <i class="fas fa-qrcode text-4xl mb-4"></i>
+                                            <p class="font-bold text-lg">Đưa mã QR vào khung</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                                        <p class="text-sm text-gray-600">
+                                            <i class="fas fa-clock mr-1"></i>
+                                            Thời gian
+                                        </p>
+                                        <p id="scanTime" class="font-semibold text-gray-900">0 giây</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                                        <p class="text-sm text-gray-600">
+                                            <i class="fas fa-redo mr-1"></i>
+                                            Lần quét
+                                        </p>
+                                        <p id="scanAttempts" class="font-semibold text-gray-900">0</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6">
+                                    <button onclick="forceScan()" 
+                                            class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 flex items-center justify-center">
+                                        <i class="fas fa-qrcode-scan mr-2"></i>
+                                        Quét Thủ Công
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 2: Front Side -->
+                    <div id="step2Content" class="hidden fade-in">
+                        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div class="p-6 border-b">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                    <i class="fas fa-camera text-blue-500 mr-2"></i>
+                                    Bước 2: Chụp Mặt Trước CCCD
+                                </h3>
+                                <p class="text-gray-600 mt-1">Đưa mặt trước CCCD vào khung. AI sẽ tự động nhận diện khuôn mặt</p>
+                            </div>
+                            
+                            <div class="p-6">
+                                <div class="camera-container rounded-lg overflow-hidden" style="height: 400px;">
+                                    <video id="camFront" autoplay playsinline class="w-full h-full object-cover"></video>
+                                    <div class="qr-overlay">
+                                        <div class="id-frame"></div>
+                                        <div class="face-frame"></div>
+                                        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-center text-white z-20">
+                                            <p class="font-bold text-lg">Mặt trước CCCD</p>
+                                            <p class="text-sm">AI tự động nhận diện khuôn mặt</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 flex justify-center space-x-4">
+                                    <button id="torchBtn" onclick="toggleTorch('torchBtn')" 
+                                            class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center">
+                                        <i class="fas fa-lightbulb mr-2"></i>
+                                        Bật đèn
+                                    </button>
+                                    
+                                    <button onclick="captureInFrame('front')" 
+                                            class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 flex items-center">
+                                        <i class="fas fa-camera mr-2"></i>
+                                        Chụp ảnh
+                                    </button>
+                                    
+                                    <button id="focusBtn" onclick="triggerFocus('focusBtn')" 
+                                            class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center">
+                                        <i class="fas fa-eye mr-2"></i>
+                                        Lấy nét
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-6">
+                                    <img id="imgFront" class="capture-preview w-full rounded-lg hidden">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 3: Back Side -->
+                    <div id="step3Content" class="hidden fade-in">
+                        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div class="p-6 border-b">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                    <i class="fas fa-camera text-blue-500 mr-2"></i>
+                                    Bước 3: Chụp Mặt Sau CCCD
+                                </h3>
+                                <p class="text-gray-600 mt-1">Lật CCCD và đưa mặt sau vào khung. Đảm bảo thông tin rõ nét</p>
+                            </div>
+                            
+                            <div class="p-6">
+                                <div class="camera-container rounded-lg overflow-hidden" style="height: 400px;">
+                                    <video id="camBack" autoplay playsinline class="w-full h-full object-cover"></video>
+                                    <div class="qr-overlay">
+                                        <div class="id-frame"></div>
+                                        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 text-center text-white z-20">
+                                            <p class="font-bold text-lg">Mặt sau CCCD</p>
+                                            <p class="text-sm">Đảm bảo thông tin rõ nét</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 flex justify-center space-x-4">
+                                    <button id="torchBtnBack" onclick="toggleTorch('torchBtnBack')" 
+                                            class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center">
+                                        <i class="fas fa-lightbulb mr-2"></i>
+                                        Bật đèn
+                                    </button>
+                                    
+                                    <button onclick="captureInFrame('back')" 
+                                            class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 flex items-center">
+                                        <i class="fas fa-camera mr-2"></i>
+                                        Chụp ảnh
+                                    </button>
+                                    
+                                    <button id="focusBtnBack" onclick="triggerFocus('focusBtnBack')" 
+                                            class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center">
+                                        <i class="fas fa-eye mr-2"></i>
+                                        Lấy nét
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-6">
+                                    <img id="imgBack" class="capture-preview w-full rounded-lg hidden">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 4: Confirm Information -->
+                    <div id="step4Content" class="hidden fade-in">
+                        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div class="p-6 border-b">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                    <i class="fas fa-check-circle text-blue-500 mr-2"></i>
+                                    Bước 4: Xác Nhận Thông Tin
+                                </h3>
+                                <p class="text-gray-600 mt-1">Kiểm tra và xác nhận thông tin trước khi lưu</p>
+                            </div>
+                            
+                            <div class="p-6">
+                                <div id="successMessageContainer"></div>
+                                
+                                <div id="previewSection" class="space-y-6">
+                                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                        <div class="bg-blue-50 px-6 py-4 border-b">
+                                            <h4 class="font-semibold text-blue-800 flex items-center">
+                                                <i class="fas fa-id-card mr-2"></i>
+                                                Thông tin CCCD
+                                            </h4>
+                                        </div>
+                                        <div class="p-6" id="preview">
+                                            <!-- Thông tin sẽ được hiển thị ở đây -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                        <div class="bg-blue-50 px-6 py-4 border-b">
+                                            <h4 class="font-semibold text-blue-800 flex items-center">
+                                                <i class="fas fa-phone mr-2"></i>
+                                                Thông tin bổ sung
+                                            </h4>
+                                        </div>
+                                        <div class="p-6">
+                                            <div class="mb-4">
+                                                <label class="block text-gray-700 text-sm font-medium mb-2">
+                                                    Số điện thoại
+                                                </label>
+                                                <input type="text" id="phoneInput" 
+                                                       class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                                       placeholder="Nhập số điện thoại">
+                                            </div>
+                                            <div class="text-sm text-gray-600">
+                                                <i class="fas fa-info-circle mr-2"></i>
+                                                Vui lòng nhập số điện thoại để hoàn tất thông tin
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="imagePreviews">
+                                        <!-- Ảnh preview sẽ được hiển thị ở đây -->
+                                    </div>
+                                    
+                                    <div class="flex flex-col sm:flex-row gap-4" id="actionButtons">
+                                        <button onclick="saveData()" 
+                                                class="flex-1 py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition duration-200 flex items-center justify-center">
+                                            <i class="fas fa-save mr-2"></i>
+                                            Lưu Thông Tin
+                                        </button>
+                                        <button onclick="resetScanProcess()" 
+                                                class="flex-1 py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition duration-200 flex items-center justify-center">
+                                            <i class="fas fa-redo mr-2"></i>
+                                            Quét Lại
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Records Screen -->
+            <div id="recordsScreen" class="hidden">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <!-- Back Button -->
+                    <div class="mb-6">
+                        <button onclick="showDashboard()" 
+                                class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Quay lại Dashboard
+                        </button>
+                    </div>
+                    
+                    <!-- Header -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                                    <i class="fas fa-database text-blue-500 mr-2"></i>
+                                    Dữ Liệu CCCD Đã Quét
+                                </h2>
+                                <p class="text-gray-600 mt-1">Quản lý và xem lại thông tin CCCD đã được quét</p>
+                            </div>
+                            <div class="mt-4 md:mt-0">
+                                <button onclick="refreshRecords()" 
+                                        class="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-medium flex items-center">
+                                    <i class="fas fa-sync-alt mr-2"></i>
+                                    Làm mới
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Search and Filters -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2">Tìm kiếm</label>
+                                <div class="relative">
+                                    <input type="text" id="searchInput" 
+                                           class="w-full px-4 py-3 pl-10 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                           placeholder="Số CCCD, Họ tên, SĐT...">
+                                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2">Sắp xếp</label>
+                                <select id="sortSelect" 
+                                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                                    <option value="newest">Mới nhất</option>
+                                    <option value="oldest">Cũ nhất</option>
+                                    <option value="name">Theo tên</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2">Hiển thị</label>
+                                <select id="limitSelect" 
+                                        class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                                    <option value="10">10 bản ghi</option>
+                                    <option value="25">25 bản ghi</option>
+                                    <option value="50">50 bản ghi</option>
+                                    <option value="100">100 bản ghi</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button onclick="searchRecords()" 
+                                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 flex items-center">
+                                <i class="fas fa-filter mr-2"></i>
+                                Áp dụng bộ lọc
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Records Table -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Số CCCD
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Họ và tên
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Ngày sinh
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Giới tính
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Số điện thoại
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Ngày tạo
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Thao tác
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="recordsTableBody">
+                                    <!-- Dữ liệu sẽ được tải ở đây -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <div class="bg-white px-6 py-4 border-t border-gray-200">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between">
+                                <div class="mb-4 md:mb-0">
+                                    <p class="text-sm text-gray-700" id="recordsInfo">
+                                        Đang tải dữ liệu...
+                                    </p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="changePage(-1)" 
+                                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </button>
+                                    <span id="pageInfo" class="text-sm text-gray-700">Trang 1 của 1</span>
+                                    <button onclick="changePage(1)" 
+                                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-id-card text-blue-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Tổng số bản ghi</p>
+                                    <p id="totalRecordsCount" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-user text-green-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Người dùng hiện tại</p>
+                                    <p id="currentUserRecords" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-calendar text-purple-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Hôm nay</p>
+                                    <p id="todayRecords" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-images text-orange-500 text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Ảnh đã lưu</p>
+                                    <p id="imagesSaved" class="text-2xl font-semibold text-gray-900">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Record Details -->
+    <div id="recordModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-xl bg-white">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-900">
+                    <i class="fas fa-id-card mr-2"></i>
+                    Chi Tiết CCCD
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div id="modalContent" class="space-y-6">
+                <!-- Nội dung modal sẽ được tải ở đây -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <script>
+        // Biến toàn cục
+        let currentUser = null;
+        let qrData = null;
+        let frontImg = null;
+        let backImg = null;
+        let currentStream = null;
+        let scanInterval = null;
+        let scanAttempts = 0;
+        let scanStartTime = 0;
+        let isScanning = false;
+        let currentPage = 1;
+        let currentLimit = 10;
+        let currentSearch = '';
+        let totalRecords = 0;
+        let totalPages = 1;
+
+        // Khởi tạo ứng dụng
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            testConnection();
+        });
+
+        // Kiểm tra trạng thái đăng nhập
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/get_user_info');
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    currentUser = data.user;
+                    showMainApp();
+                    updateUserInfo();
+                    loadDashboardStats();
+                } else {
+                    showLoginScreen();
+                }
+            } catch (error) {
+                console.error("Lỗi kiểm tra đăng nhập:", error);
+                showLoginScreen();
+            }
+        }
+
+        // Đăng nhập
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            
+            if (!username) {
+                showToast('Vui lòng nhập tên đăng nhập', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUser = data.user;
+                    showMainApp();
+                    updateUserInfo();
+                    loadDashboardStats();
+                    showToast('Đăng nhập thành công!', 'success');
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (error) {
+                console.error("Lỗi đăng nhập:", error);
+                showToast('Lỗi kết nối máy chủ', 'error');
+            }
+        }
+
+        // Đăng xuất
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        // Hiển thị màn hình đăng nhập
+        function showLoginScreen() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+
+        // Hiển thị ứng dụng chính
+        function showMainApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            showDashboard();
+        }
+
+        // Cập nhật thông tin người dùng
+        function updateUserInfo() {
+            if (currentUser) {
+                document.getElementById('userInfo').textContent = 
+                    `${currentUser.fullname} (${currentUser.role})`;
+            }
+        }
+
+        // Hiển thị dashboard
+        function showDashboard() {
+            document.getElementById('dashboardScreen').classList.remove('hidden');
+            document.getElementById('scanScreen').classList.add('hidden');
+            document.getElementById('recordsScreen').classList.add('hidden');
+        }
+
+        // Hiển thị màn hình quét
+        function showScanScreen() {
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('scanScreen').classList.remove('hidden');
+            document.getElementById('recordsScreen').classList.add('hidden');
+            
+            // Reset quá trình quét
+            resetScanProcess();
+            initializeCamera();
+        }
+
+        // Hiển thị màn hình xem dữ liệu
+        function showRecordsScreen() {
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('scanScreen').classList.add('hidden');
+            document.getElementById('recordsScreen').classList.remove('hidden');
+            
+            // Tải dữ liệu
+            loadRecords();
+        }
+
+        // Hiển thị toast thông báo
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMessage.textContent = message;
+            
+            // Đặt icon và màu sắc theo loại toast
+            let iconClass = 'fas fa-info-circle';
+            let iconColor = 'text-blue-500';
+            
+            switch(type) {
+                case 'success':
+                    iconClass = 'fas fa-check-circle';
+                    iconColor = 'text-green-500';
+                    break;
+                case 'error':
+                    iconClass = 'fas fa-exclamation-circle';
+                    iconColor = 'text-red-500';
+                    break;
+                case 'warning':
+                    iconClass = 'fas fa-exclamation-triangle';
+                    iconColor = 'text-yellow-500';
+                    break;
+            }
+            
+            toastIcon.innerHTML = `<i class="${iconClass} ${iconColor} text-xl"></i>`;
+            toast.classList.remove('hidden');
+            
+            // Tự động ẩn toast sau 5 giây
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Ẩn toast
+        function hideToast() {
+            document.getElementById('toast').classList.add('hidden');
+        }
+
+        // Kiểm tra kết nối
+        async function testConnection() {
+            try {
+                const response = await fetch('/testConnection');
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    document.getElementById('connectionStatus').textContent = 'Đã kết nối';
+                    document.getElementById('aiStatus').textContent = `AI: ${data.aiEnabled ? 'Sẵn sàng' : 'Đang tải'}`;
+                    document.getElementById('aiStatusMain').textContent = data.aiEnabled ? 'Sẵn sàng' : 'Tạm dừng';
+                    document.getElementById('dbStatus').textContent = 'Database: Đã kết nối';
+                    document.getElementById('dbStatusMain').textContent = 'Đã kết nối';
+                } else {
+                    document.getElementById('connectionStatus').textContent = 'Lỗi kết nối';
+                    document.getElementById('dbStatus').textContent = 'Database: Lỗi kết nối';
+                    document.getElementById('dbStatusMain').textContent = 'Lỗi kết nối';
+                }
+            } catch (error) {
+                console.error("Lỗi kiểm tra kết nối:", error);
+                document.getElementById('connectionStatus').textContent = 'Lỗi kết nối';
+                document.getElementById('dbStatus').textContent = 'Database: Lỗi kết nối';
+                document.getElementById('dbStatusMain').textContent = 'Lỗi kết nối';
+            }
+        }
+
+        // Tải thống kê dashboard
+        async function loadDashboardStats() {
+            try {
+                const response = await fetch(`/get_records?page=1&limit=1`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('totalRecords').textContent = data.total;
+                    totalRecords = data.total;
+                }
+            } catch (error) {
+                console.error("Lỗi tải thống kê:", error);
+            }
+        }
+
+        // Khởi tạo camera
+        async function initializeCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                
+                document.getElementById("camera").srcObject = stream;
+                document.getElementById("camFront").srcObject = stream;
+                document.getElementById("camBack").srcObject = stream;
+                
+                startAutoScan();
+                
+            } catch (err) {
+                console.error("Lỗi truy cập camera: ", err);
+                showToast("Lỗi: Không thể truy cập camera. Vui lòng cho phép quyền sử dụng camera.", "error");
+            }
+        }
+
+        // Bắt đầu quét tự động
+        function startAutoScan() {
+            if (isScanning) return;
+            
+            isScanning = true;
+            scanStartTime = Date.now();
+            scanAttempts = 0;
+            
+            // Cập nhật thời gian quét
+            const timeInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+                document.getElementById("scanTime").textContent = `${elapsed} giây`;
+            }, 1000);
+            
+            scanInterval = setInterval(() => {
+                const video = document.getElementById("camera");
+                if (!video.videoWidth || !video.videoHeight) {
+                    return;
+                }
+                
+                try {
+                    scanAttempts++;
+                    document.getElementById("scanAttempts").textContent = scanAttempts;
+                    
+                    const code = scanQRCode(video);
+                    
+                    if (code) {
+                        clearInterval(timeInterval);
+                        handleQRScanSuccess(code);
+                    }
+                } catch (error) {
+                    console.error("Lỗi khi quét QR:", error);
+                }
+            }, 500);
+        }
+
+        // Quét mã QR
+        function scanQRCode(video) {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            return jsQR(imageData.data, canvas.width, canvas.height);
+        }
+
+        // Xử lý khi quét QR thành công
+        async function handleQRScanSuccess(code) {
+            clearInterval(scanInterval);
+            isScanning = false;
+            
+            try {
+                qrData = parseQR(code.data);
+                
+                // Kiểm tra trùng CCCD
+                const isDuplicate = await checkDuplicateCCCD(qrData.cccd_moi);
+                
+                if (isDuplicate) {
+                    showToast(`Số CCCD ${qrData.cccd_moi} đã tồn tại trong hệ thống!`, "error");
+                    startAutoScan();
+                    return;
+                }
+                
+                showToast("Đã quét mã QR thành công!", "success");
+                showStep(2);
+                
+            } catch (parseError) {
+                console.error("Lỗi phân tích QR:", parseError);
+                showToast("QR code không hợp lệ", "error");
+                startAutoScan();
+            }
+        }
+
+        // Quét thủ công
+        function forceScan() {
+            const video = document.getElementById("camera");
+            const code = scanQRCode(video);
+            
+            if (code) {
+                handleQRScanSuccess(code);
+            } else {
+                showToast("Không tìm thấy QR code. Thử lại!", "warning");
+            }
+        }
+
+        // Kiểm tra trùng CCCD
+        async function checkDuplicateCCCD(cccdNumber) {
+            try {
+                const response = await fetch('/checkDuplicate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ cccd: cccdNumber })
+                });
+                
+                const data = await response.json();
+                return data.duplicate;
+            } catch (error) {
+                console.error("Lỗi kiểm tra trùng CCCD:", error);
+                return false;
+            }
+        }
+
+        // Phân tích dữ liệu QR
+        function parseQR(text) {
+            if (!text.includes('|')) {
+                throw new Error("Định dạng QR code không hợp lệ");
+            }
+            
+            let arr = text.split("|");
+            
+            if (arr.length < 7) {
+                throw new Error("QR code không đủ thông tin");
+            }
+
+            let gender = arr[4] === "Nam" ? "Nam" : (arr[4] === "Nữ" ? "Nữ" : "Không rõ");
+            let dob = formatDate(arr[3]);
+            let issueDate = formatDate(arr[6]);
+
+            return {
+                cccd_moi: arr[0] || "Không xác định",
+                cmnd_cu: arr[1] || "",
+                name: arr[2] || "Không xác định",
+                gender: gender,
+                dob: dob,
+                address: arr[5] || "Không xác định",
+                issue_date: issueDate
+            };
+        }
+
+        // Định dạng ngày tháng
+        function formatDate(dateStr) {
+            if (!dateStr || dateStr.length !== 8) return dateStr;
+            return dateStr.substring(0,2) + '/' + dateStr.substring(2,4) + '/' + dateStr.substring(4,8);
+        }
+
+        // Hiển thị bước
+        function showStep(stepNumber) {
+            // Ẩn tất cả các bước
+            document.querySelectorAll('[id$="Content"]').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // Hiển thị bước được chọn
+            document.getElementById(`step${stepNumber}Content`).classList.remove('hidden');
+            
+            // Cập nhật chỉ bước
+            document.querySelectorAll('.step').forEach((el, index) => {
+                if (index + 1 < stepNumber) {
+                    el.className = 'step w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold';
+                } else if (index + 1 === stepNumber) {
+                    el.className = 'step w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold';
+                } else {
+                    el.className = 'step w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold';
+                }
+            });
+        }
+
+        // Bật/tắt đèn flash
+        async function toggleTorch(btnId) {
+            if (!currentStream) return;
+            
+            const track = currentStream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            if (!capabilities.torch) {
+                showToast("Camera của bạn không hỗ trợ đèn flash", "warning");
+                return;
+            }
+            
+            try {
+                const torchBtn = document.getElementById(btnId);
+                const isActive = torchBtn.classList.contains("active");
+                
+                await track.applyConstraints({
+                    advanced: [{ torch: !isActive }]
+                });
+                
+                if (!isActive) {
+                    torchBtn.classList.add("active");
+                    torchBtn.innerHTML = '<i class="fas fa-lightbulb mr-2"></i>Tắt đèn';
+                    torchBtn.classList.add("bg-yellow-100", "text-yellow-800");
+                } else {
+                    torchBtn.classList.remove("active");
+                    torchBtn.innerHTML = '<i class="fas fa-lightbulb mr-2"></i>Bật đèn';
+                    torchBtn.classList.remove("bg-yellow-100", "text-yellow-800");
+                }
+            } catch (err) {
+                console.error("Lỗi khi bật/tắt đèn flash: ", err);
+            }
+        }
+
+        // Lấy nét
+        async function triggerFocus(btnId) {
+            if (!currentStream) return;
+            
+            const track = currentStream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            if (!capabilities.focusMode || !capabilities.focusMode.includes("auto")) {
+                showToast("Camera của bạn không hỗ trợ lấy nét tự động", "warning");
+                return;
+            }
+            
+            try {
+                await track.applyConstraints({
+                    advanced: [{ focusMode: "auto" }]
+                });
+                
+                const focusBtn = document.getElementById(btnId);
+                focusBtn.classList.add("bg-green-100", "text-green-800");
+                setTimeout(() => {
+                    focusBtn.classList.remove("bg-green-100", "text-green-800");
+                }, 500);
+            } catch (err) {
+                console.error("Lỗi khi lấy nét: ", err);
+            }
+        }
+
+        // Chụp ảnh trong khung
+        async function captureInFrame(type) {
+            const videoId = type === 'front' ? 'camFront' : 'camBack';
+            const previewId = type === 'front' ? 'imgFront' : 'imgBack';
+            
+            const video = document.getElementById(videoId);
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            
+            // Khung chụp chiếm 80% chiều rộng và 80% chiều cao, căn giữa
+            const frameX = videoWidth * 0.1;
+            const frameY = videoHeight * 0.1;
+            const frameWidth = videoWidth * 0.8;
+            const frameHeight = videoHeight * 0.8;
+            
+            canvas.width = frameWidth;
+            canvas.height = frameHeight;
+            
+            ctx.drawImage(
+                video, 
+                frameX, frameY, frameWidth, frameHeight,
+                0, 0, frameWidth, frameHeight
+            );
+            
+            const img64 = canvas.toDataURL("image/jpeg", 0.9);
+            
+            const previewImg = document.getElementById(previewId);
+            previewImg.src = img64;
+            previewImg.classList.remove("hidden");
+            
+            if (type === 'front') {
+                frontImg = img64;
+                showToast("Đã chụp mặt trước thành công! AI sẽ tự động nhận diện khuôn mặt.", "success");
+                
+                setTimeout(() => {
+                    showStep(3);
+                }, 1000);
+            } else {
+                backImg = img64;
+                showToast("Đã chụp mặt sau thành công!", "success");
+                
+                setTimeout(() => {
+                    showStep(4);
+                    displayQRInfo();
+                }, 1000);
+            }
+        }
+
+        // Hiển thị thông tin QR
+        function displayQRInfo() {
+            document.getElementById("preview").innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Số CCCD mới</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.cccd_moi}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Số CMND cũ</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.cmnd_cu}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.name}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.gender}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.dob}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.address}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày cấp</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${qrData.issue_date}</div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById("imagePreviews").innerHTML = `
+                <div class="col-span-1">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h5 class="font-medium text-gray-900 mb-3 flex items-center">
+                            <i class="fas fa-camera mr-2"></i>
+                            Mặt trước CCCD
+                        </h5>
+                        <img src="${frontImg}" class="w-full h-48 object-cover rounded-lg">
+                    </div>
+                </div>
+                <div class="col-span-1">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h5 class="font-medium text-gray-900 mb-3 flex items-center">
+                            <i class="fas fa-camera mr-2"></i>
+                            Mặt sau CCCD
+                        </h5>
+                        <img src="${backImg}" class="w-full h-48 object-cover rounded-lg">
+                    </div>
+                </div>
+                <div class="col-span-1">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h5 class="font-medium text-gray-900 mb-3 flex items-center">
+                            <i class="fas fa-robot mr-2"></i>
+                            Ảnh khuôn mặt (AI)
+                        </h5>
+                        <div class="w-full h-48 flex items-center justify-center bg-gray-100 rounded-lg">
+                            <div class="text-center">
+                                <i class="fas fa-cpu text-3xl text-gray-400 mb-2"></i>
+                                <p class="text-sm text-gray-600">Sẽ được tự động nhận diện khi lưu</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Trích xuất base64 từ data URL
+        function extractBase64Data(dataUrl) {
+            if (!dataUrl) return '';
+            return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        }
+
+        // Lưu dữ liệu
+        async function saveData() {
+            if (!qrData || !frontImg || !backImg) {
+                showToast("Vui lòng hoàn tất các bước trước khi lưu!", "warning");
+                return;
+            }
+
+            const phone = document.getElementById('phoneInput').value.trim();
+            if (!phone) {
+                showToast("Vui lòng nhập số điện thoại!", "warning");
+                return;
+            }
+
+            const postData = {
+                cccd_moi: String(qrData.cccd_moi),
+                cmnd_cu: String(qrData.cmnd_cu),
+                name: qrData.name,
+                gender: qrData.gender,
+                dob: qrData.dob,
+                address: qrData.address,
+                issue_date: qrData.issue_date,
+                phone: phone,
+                front: extractBase64Data(frontImg),
+                back: extractBase64Data(backImg)
+            };
+
+            const saveBtn = document.querySelector('[onclick="saveData()"]');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<div class="spinner mr-2"></div>Đang lưu và nhận diện khuôn mặt...';
+            saveBtn.disabled = true;
+
+            try {
+                const response = await fetch('/saveCCCD', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(postData)
+                });
+                
+                const res = await response.json();
+                
+                if (res.success) {
+                    showSuccessMessage(res);
+                } else {
+                    saveBtn.innerHTML = originalText;
+                    saveBtn.disabled = false;
+                    
+                    if (res.error === "duplicate") {
+                        showToast(`Số CCCD ${res.duplicateCCCD} đã tồn tại trong hệ thống!`, "error");
+                    } else {
+                        showToast("Lỗi: " + res.message, "error");
+                    }
+                }
+            } catch (err) {
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+                showToast("Lỗi kết nối: " + err.toString(), "error");
+            }
+        }
+
+        // Hiển thị thông báo thành công
+        function showSuccessMessage(res) {
+            document.getElementById("successMessageContainer").innerHTML = `
+                <div class="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-check-circle text-green-500 text-3xl"></i>
+                        </div>
+                        <div class="ml-4">
+                            <h4 class="text-lg font-semibold text-green-800">Lưu thành công!</h4>
+                            <p class="text-green-700 mt-1">
+                                Thông tin CCCD đã được lưu thành công.
+                                ${res.face_detected ? 'Đã nhận diện khuôn mặt bằng AI.' : 'Không tìm thấy khuôn mặt trong ảnh.'}
+                            </p>
+                            <div class="mt-4 space-y-2">
+                                <p class="text-sm text-green-600">
+                                    <i class="fas fa-id-card mr-2"></i>
+                                    Số CCCD: ${res.cccd}
+                                </p>
+                                <p class="text-sm text-green-600">
+                                    <i class="fas fa-user mr-2"></i>
+                                    Người thực hiện: ${currentUser?.fullname || currentUser?.username}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById("previewSection").classList.add("hidden");
+            
+            setTimeout(() => {
+                showDashboard();
+            }, 3000);
+        }
+
+        // Reset quá trình quét
+        function resetScanProcess() {
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                isScanning = false;
+            }
+            
+            qrData = null;
+            frontImg = null;
+            backImg = null;
+            scanAttempts = 0;
+            
+            document.getElementById("imgFront").classList.add("hidden");
+            document.getElementById("imgBack").classList.add("hidden");
+            document.getElementById("scanAttempts").textContent = "0";
+            document.getElementById("scanTime").textContent = "0 giây";
+            document.getElementById("phoneInput").value = "";
+            
+            document.getElementById("successMessageContainer").innerHTML = '';
+            document.getElementById("previewSection").classList.remove("hidden");
+            
+            showStep(1);
+            startAutoScan();
+        }
+
+        // Tải dữ liệu records
+        async function loadRecords(page = currentPage, limit = currentLimit, search = currentSearch) {
+            try {
+                const response = await fetch(`/get_records?page=${page}&limit=${limit}&search=${search}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayRecords(data.records);
+                    updatePagination(data.total, data.page, data.total_pages);
+                    updateRecordsStats(data.total);
+                } else {
+                    showToast("Lỗi tải dữ liệu: " + data.message, "error");
+                }
+            } catch (error) {
+                console.error("Lỗi tải records:", error);
+                showToast("Lỗi kết nối khi tải dữ liệu", "error");
+            }
+        }
+
+        // Hiển thị records
+        function displayRecords(records) {
+            const tbody = document.getElementById('recordsTableBody');
+            
+            if (records.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center">
+                            <i class="fas fa-database text-3xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">Không có dữ liệu</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = records.map(record => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="font-medium text-gray-900">${record.cccd_moi}</div>
+                        ${record.cmnd_cu ? `<div class="text-sm text-gray-500">CMND cũ: ${record.cmnd_cu}</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="font-medium text-gray-900">${record.name}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-gray-900">${record.dob || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${record.gender === 'Nam' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'}">
+                            ${record.gender || 'N/A'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-gray-900">${record.phone || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${record.created_at || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="viewRecordDetail(${record.id})" 
+                                class="text-blue-600 hover:text-blue-900 mr-4">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Cập nhật phân trang
+        function updatePagination(total, page, totalPages) {
+            totalRecords = total;
+            currentPage = page;
+            totalPages = totalPages;
+            
+            document.getElementById('recordsInfo').textContent = 
+                `Hiển thị ${((page - 1) * currentLimit) + 1}-${Math.min(page * currentLimit, total)} của ${total} bản ghi`;
+            
+            document.getElementById('pageInfo').textContent = `Trang ${page} của ${totalPages}`;
+            
+            // Cập nhật thống kê
+            document.getElementById('totalRecordsCount').textContent = total;
+        }
+
+        // Cập nhật thống kê records
+        function updateRecordsStats(total) {
+            // Đây là nơi bạn có thể thêm logic để tính toán các thống kê khác
+            document.getElementById('currentUserRecords').textContent = total; // Tạm thời hiển thị tổng số
+            document.getElementById('todayRecords').textContent = '0'; // Cần thêm logic tính toán
+            document.getElementById('imagesSaved').textContent = total * 3; // Giả sử mỗi record có 3 ảnh
+        }
+
+        // Tìm kiếm records
+        function searchRecords() {
+            currentSearch = document.getElementById('searchInput').value;
+            currentPage = 1;
+            loadRecords();
+        }
+
+        // Thay đổi trang
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                loadRecords(newPage);
+            }
+        }
+
+        // Làm mới records
+        function refreshRecords() {
+            loadRecords();
+            showToast("Đã làm mới dữ liệu", "success");
+        }
+
+        // Xem chi tiết record
+        async function viewRecordDetail(recordId) {
+            try {
+                const response = await fetch(`/get_record_detail/${recordId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    showRecordModal(data.record);
+                } else {
+                    showToast("Không tìm thấy bản ghi", "error");
+                }
+            } catch (error) {
+                console.error("Lỗi tải chi tiết record:", error);
+                showToast("Lỗi tải chi tiết", "error");
+            }
+        }
+
+        // Hiển thị modal chi tiết
+        function showRecordModal(record) {
+            const modal = document.getElementById('recordModal');
+            const content = document.getElementById('modalContent');
+            
+            content.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Số CCCD mới</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.cccd_moi}</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Số CMND cũ</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.cmnd_cu || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.name}</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.gender || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.dob || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ngày cấp</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.issue_date || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.phone || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Người thực hiện</label>
+                            <div class="px-3 py-2 bg-gray-50 rounded border">${record.user || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${record.address || 'N/A'}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ngày tạo</label>
+                        <div class="px-3 py-2 bg-gray-50 rounded border">${record.created_at || 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    ${record.front_image ? `
+                        <div class="text-center">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mặt trước</label>
+                            <div class="relative">
+                                <img src="${record.front_image}" class="w-full h-48 object-cover rounded-lg">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition duration-200 rounded-lg"></div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${record.back_image ? `
+                        <div class="text-center">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mặt sau</label>
+                            <div class="relative">
+                                <img src="${record.back_image}" class="w-full h-48 object-cover rounded-lg">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition duration-200 rounded-lg"></div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${record.face_cropped ? `
+                        <div class="text-center">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Khuôn mặt (AI)</label>
+                            <div class="relative">
+                                <img src="${record.face_cropped}" class="w-full h-48 object-cover rounded-lg">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition duration-200 rounded-lg"></div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="text-center">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Khuôn mặt</label>
+                            <div class="w-full h-48 flex items-center justify-center bg-gray-100 rounded-lg">
+                                <div class="text-center">
+                                    <i class="fas fa-user-slash text-2xl text-gray-400 mb-2"></i>
+                                    <p class="text-sm text-gray-600">Không có ảnh</p>
+                                </div>
+                            </div>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="mt-6 flex justify-end">
+                    <button onclick="closeModal()" 
+                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                        Đóng
+                    </button>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        // Đóng modal
+        function closeModal() {
+            document.getElementById('recordModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
