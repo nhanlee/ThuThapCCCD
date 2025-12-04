@@ -41,7 +41,7 @@ def init_db():
     connection = None
     try:
         connection = pymysql.connect(**MYSQL_CONFIG)
-        logger.info(f"✅ Kết nối database thành công! Host: {DB_HOST}, Database: {DB_NAME}")
+        logger.info(f"Kết nối database thành công! Host: {DB_HOST}, Database: {DB_NAME}")
         
         with connection.cursor() as cursor:
             # Tạo bảng users
@@ -84,18 +84,18 @@ def init_db():
                         INSERT INTO users (username, fullname, role) VALUES 
                         ('admin', 'Quản trị viên', 'admin')
                     """)
-                    logger.info("✅ Đã thêm users mẫu")
+                    logger.info("Đã thêm users mẫu")
                 except Exception as insert_error:
                     logger.warning(f"Không thể thêm users mẫu: {insert_error}")
                 
         connection.commit()
-        logger.info("✅ Database initialized successfully")
+        logger.info("Database initialized successfully")
         
         # Đếm số lượng records
         with connection.cursor() as cursor:
             cursor.execute("SELECT COUNT(*) as count FROM cccd_records")
             result = cursor.fetchone()
-            logger.info(f"✅ Số lượng records trong database: {result['count'] if result else 0}")
+            logger.info(f"Số lượng records trong database: {result['count'] if result else 0}")
             
     except Exception as e:
         logger.error(f"❌ Error initializing database: {e}")
@@ -108,7 +108,7 @@ def init_db():
 # Gọi init_db() khi khởi động
 try:
     init_db()
-    logger.info("✅ Database initialization completed successfully")
+    logger.info("Database initialization completed successfully")
 except Exception as e:
     logger.error(f"❌ Could not initialize database on startup: {e}")
 
@@ -120,9 +120,9 @@ def check_db_connection():
             cursor.execute("SELECT 1")
             result = cursor.fetchone()
             if result and result.get('1') == 1:
-                return True, "✅ Kết nối database thành công!"
+                return True, "Kết nối database thành công!"
         connection.close()
-        return True, "✅ Kết nối database thành công!"
+        return True, "Kết nối database thành công!"
     except Exception as e:
         error_msg = f"❌ Lỗi kết nối database: {str(e)}"
         logger.error(error_msg)
@@ -170,7 +170,7 @@ def login():
                 session['fullname'] = user['fullname']
                 session['role'] = user['role']
                 
-                logger.info(f"✅ User {username} đăng nhập thành công")
+                logger.info(f"User {username} đăng nhập thành công")
                 
                 return jsonify({
                     'success': True,
@@ -250,7 +250,7 @@ def save_cccd():
                 'duplicateCCCD': cccd_number
             }), 400
         
-        logger.info("✅ CCCD chưa tồn tại, tiếp tục xử lý...")
+        logger.info("CCCD chưa tồn tại, tiếp tục xử lý...")
 
         # Lấy ảnh mặt trước và mặt sau
         front_base64 = data.get('front')
@@ -307,7 +307,7 @@ def save_cccd():
                     back_base64
                 ))
             connection.commit()
-            logger.info(f"✅ Đã lưu CCCD {cccd_number} vào database")
+            logger.info(f"Đã lưu CCCD {cccd_number} vào database")
         except Exception as db_error:
             logger.error(f"❌ Lỗi khi lưu vào database: {db_error}")
             raise
@@ -528,7 +528,7 @@ def test_connection():
             },
             'scanner': {
                 'success': True,
-                'message': '✅ QR Scanner sẵn sàng',
+                'message': 'QR Scanner sẵn sàng',
                 'technology': 'jsQR'
             }
         })
